@@ -3,6 +3,12 @@ import { getServerSession } from 'next-auth'
 import { getToken } from 'next-auth/jwt'
 import { v2 as cloudinary } from 'cloudinary'
 import { PrismaClient } from '@prisma/client'
+import { 
+  isSupportedImageType, 
+  isFileSizeValid, 
+  MAX_FILE_SIZE,
+  SUPPORTED_IMAGE_TYPES 
+} from '@/lib/imageOptimization'
 
 const prisma = new PrismaClient()
 
@@ -58,7 +64,28 @@ export async function POST(request: NextRequest) {
       )
     }
 
-    console.log('Upload API - File received:', file.name, 'Size:', file.size)
+    console.log('Upload API - File received:', file.name, 'Size:', file.size, 'bytes')
+    console.log('Upload API - File type:', file.type)
+
+    // Validate file type
+    if (!isSupportedImageType(file)) {
+      return NextResponse.json(
+        { 
+          error: `Unsupported file type. Supported types: ${SUPPORTED_IMAGE_TYPES.join(', ')}` 
+        },
+        { status: 400 }
+      )
+    }
+
+    // Validate file size
+    if (!isFileSizeValid(file)) {
+      return NextResponse.json(
+        { 
+          error: `File size too large. Maximum size: ${(MAX_FILE_SIZE / (1024 * 1024)).toFixed(1)}MB` 
+        },
+        { status: 400 }
+      )
+    }
 
     // Convert file to buffer
     const bytes = await file.arrayBuffer()
