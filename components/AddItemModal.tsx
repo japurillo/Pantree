@@ -1,8 +1,9 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Upload, Plus } from 'lucide-react'
+import { X, Plus } from 'lucide-react'
 import useSWR, { mutate } from 'swr'
+import ImageUpload from './ui/ImageUpload'
 
 interface Category {
   id: string
@@ -25,6 +26,7 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
   })
   const [imageFile, setImageFile] = useState<File | null>(null)
   const [imagePreview, setImagePreview] = useState<string>('')
+  const [isImageOptimizing, setIsImageOptimizing] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
 
   const { data: categories = [] } = useSWR<Category[]>('/api/categories')
@@ -39,21 +41,12 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
     }))
   }
 
-  const handleImageChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const file = e.target.files?.[0]
-    if (file) {
-      setImageFile(file)
-      const reader = new FileReader()
-      reader.onloadend = () => {
-        setImagePreview(reader.result as string)
-      }
-      reader.readAsDataURL(file)
-    }
-  }
+
 
   const uploadImage = async (): Promise<string | null> => {
     if (!imageFile) return null
 
+    console.log('AddItemModal: Starting image upload for file:', imageFile.name, 'Size:', imageFile.size, 'bytes')
     const formData = new FormData()
     formData.append('file', imageFile)
 
@@ -66,14 +59,15 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
 
       if (response.ok) {
         const data = await response.json()
+        console.log('AddItemModal: Image upload successful:', data.url)
         return data.url
       } else {
         const errorData = await response.json()
-        console.error('Upload failed:', errorData)
+        console.error('AddItemModal: Upload failed:', errorData)
         throw new Error(errorData.error || 'Upload failed')
       }
     } catch (error) {
-      console.error('Error uploading image:', error)
+      console.error('AddItemModal: Error uploading image:', error)
       throw error
     }
   }
@@ -255,35 +249,28 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
               </div>
 
               <div>
-                <label htmlFor="image" className="block text-sm font-medium text-gray-700">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
                   Item Image
                 </label>
-                <div className="mt-1">
-                  <input
-                    id="image"
-                    name="image"
-                    type="file"
-                    accept="image/*"
-                    onChange={handleImageChange}
-                    className="hidden"
-                  />
-                  <label
-                    htmlFor="image"
-                    className="cursor-pointer inline-flex items-center px-4 py-2 border border-gray-300 rounded-md shadow-sm text-sm font-medium text-gray-700 bg-white hover:bg-gray-50"
-                  >
-                    <Upload className="h-4 w-4 mr-2" />
-                    Upload Image
-                  </label>
-                </div>
-                {imagePreview && (
-                  <div className="mt-2">
-                    <img
-                      src={imagePreview}
-                      alt="Preview"
-                      className="h-20 w-20 object-cover rounded-lg"
-                    />
-                  </div>
-                )}
+                <ImageUpload
+                  onImageSelect={(file) => {
+                    console.log('AddItemModal: Image selected:', file.name, 'Size:', file.size, 'bytes')
+                    setImageFile(file)
+                    const reader = new FileReader()
+                    reader.onloadend = () => {
+                      setImagePreview(reader.result as string)
+                    }
+                    reader.readAsDataURL(file)
+                  }}
+                  onImageRemove={() => {
+                    setImageFile(null)
+                    setImagePreview('')
+                  }}
+                  selectedImage={imagePreview}
+                  autoOptimize={true}
+                  onOptimizationStart={() => setIsImageOptimizing(true)}
+                  onOptimizationComplete={() => setIsImageOptimizing(false)}
+                />
               </div>
             </form>
           </div>
@@ -292,11 +279,13 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
             <button
               type="submit"
               onClick={handleSubmit}
-              disabled={isLoading || !formData.name || !formData.categoryId}
+              disabled={isLoading || !formData.name || !formData.categoryId || isImageOptimizing}
               className="btn-primary w-full sm:w-auto sm:ml-3"
             >
               {isLoading ? (
                 'Creating...'
+              ) : isImageOptimizing ? (
+                'Optimizing Image...'
               ) : (
                 <>
                   <Plus className="h-4 w-4 mr-2" />
