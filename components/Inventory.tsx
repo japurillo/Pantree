@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { Plus, Package, Users, LogOut, Menu, X, ArrowLeft, BarChart3, Settings, FolderOpen } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import LowStockDashboard from './LowStockDashboard'
+
 import InventoryList from './InventoryList'
 import EditItemModal from './EditItemModal'
 import AddItemModal from './AddItemModal'
@@ -46,29 +46,7 @@ export default function Inventory() {
     setSelectedItem(null)
   }
 
-  const managementCards = [
-    {
-      title: 'Low Stock Alerts',
-      description: 'View items that need restocking',
-      icon: Package,
-      color: 'bg-orange-500',
-      action: () => router.push('/')
-    },
-    {
-      title: 'Categories',
-      description: 'Manage item categories',
-      icon: Package,
-      color: 'bg-blue-500',
-      action: () => router.push('/categories')
-    },
-    {
-      title: 'Analytics',
-      description: 'View consumption patterns',
-      icon: BarChart3,
-      color: 'bg-purple-500',
-      action: () => router.push('/analytics')
-    }
-  ]
+
 
   return (
     <div className="min-h-screen bg-gray-50">
@@ -205,7 +183,7 @@ export default function Inventory() {
                 <div>
                   <h2 className="text-2xl font-bold text-gray-900">Inventory Management</h2>
                   <p className="mt-2 text-gray-600">
-                    Manage your pantry items, categories, and view detailed analytics. Click on any item card to edit its stock levels.
+                    Manage your pantry items and categories. Click on any item card to edit its stock levels and thresholds.
                   </p>
                 </div>
                 <button
@@ -217,42 +195,9 @@ export default function Inventory() {
                 </button>
               </div>
 
-              {/* Management Cards */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Quick Actions</h3>
-                <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
-                  {managementCards.map((card, index) => {
-                    const IconComponent = card.icon
-                    return (
-                      <button
-                        key={index}
-                        onClick={card.action}
-                        className="group relative bg-white rounded-lg shadow-sm border border-gray-200 p-6 hover:shadow-md transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary-500"
-                      >
-                        <div className="flex items-center justify-between mb-4">
-                          <div className={`p-3 rounded-lg ${card.color}`}>
-                            <IconComponent className="h-6 w-6 text-white" />
-                          </div>
-                        </div>
-                        
-                        <h4 className="text-lg font-semibold text-gray-900 mb-2 group-hover:text-primary-600 transition-colors">
-                          {card.title}
-                        </h4>
-                        
-                        <p className="text-sm text-gray-600">
-                          {card.description}
-                        </p>
-                      </button>
-                    )
-                  })}
-                </div>
-              </div>
 
-              {/* Low Stock Dashboard */}
-              <div>
-                <h3 className="text-lg font-semibold text-gray-900 mb-4">Low Stock Alerts</h3>
-                <LowStockDashboard />
-              </div>
+
+
 
               {/* All Inventory Items */}
               <div>
