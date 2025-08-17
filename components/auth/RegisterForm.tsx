@@ -34,9 +34,8 @@ export default function RegisterForm() {
     }
 
     try {
-      const response = await fetch('/api/users', {
+      const response = await fetch('/api/auth/register', {
         method: 'POST',
-        credentials: 'include',
         headers: {
           'Content-Type': 'application/json',
         },
@@ -63,7 +62,7 @@ export default function RegisterForm() {
   return (
     <form onSubmit={handleSubmit} className="space-y-6">
       {error && (
-        <div className="bg-danger-50 border border-danger-200 text-danger-700 px-4 py-3 rounded-lg">
+        <div className="bg-red-50 border border-red-200 text-red-700 px-4 py-3 rounded-lg">
           {error}
         </div>
       )}
