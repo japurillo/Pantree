@@ -102,11 +102,7 @@ export default function InventoryItem({ item, onEdit }: InventoryItemProps) {
           </p>
         )}
 
-        <div className="mt-2 sm:mt-3 text-center">
-          <span className="text-xs text-primary-600 font-medium">
-            Click to edit stock levels
-          </span>
-        </div>
+
       </div>
     </button>
   )

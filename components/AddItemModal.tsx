@@ -1,13 +1,28 @@
 'use client'
 
-import { useState } from 'react'
-import { X, Plus } from 'lucide-react'
+import { useState, useEffect, useRef } from 'react'
+import { X, Plus, Search, Package } from 'lucide-react'
 import useSWR, { mutate } from 'swr'
 import ImageUpload from './ui/ImageUpload'
+import NumberStepper from './ui/NumberStepper'
 
 interface Category {
   id: string
   name: string
+}
+
+interface Item {
+  id: string
+  name: string
+  quantity: number
+  threshold: number
+  imageUrl?: string
+  description?: string
+  notes?: string
+  category: {
+    id: string
+    name: string
+  }
 }
 
 interface AddItemModalProps {
@@ -28,8 +43,12 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
   const [imagePreview, setImagePreview] = useState<string>('')
   const [isImageOptimizing, setIsImageOptimizing] = useState(false)
   const [isLoading, setIsLoading] = useState(false)
+  const [showSuggestions, setShowSuggestions] = useState(false)
+  const [filteredSuggestions, setFilteredSuggestions] = useState<Item[]>([])
+  const nameInputRef = useRef<HTMLInputElement>(null)
 
   const { data: categories = [] } = useSWR<Category[]>('/api/categories')
+  const { data: existingItems = [] } = useSWR<Item[]>('/api/items')
 
   if (!isOpen) return null
 
@@ -39,6 +58,45 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
       ...prev,
       [name]: name === 'quantity' || name === 'threshold' ? parseInt(value) || 0 : value
     }))
+
+    // Handle name search suggestions
+    if (name === 'name') {
+      if (value.trim().length > 0) {
+        const filtered = existingItems.filter(item => 
+          item.name.toLowerCase().includes(value.toLowerCase())
+        )
+        setFilteredSuggestions(filtered)
+        setShowSuggestions(filtered.length > 0)
+      } else {
+        setShowSuggestions(false)
+        setFilteredSuggestions([])
+      }
+    }
+  }
+
+  const handleSuggestionClick = (item: Item) => {
+    setFormData(prev => ({
+      ...prev,
+      name: item.name,
+      categoryId: item.category.id,
+      description: item.description || '',
+      notes: item.notes || ''
+    }))
+    setShowSuggestions(false)
+    setFilteredSuggestions([])
+  }
+
+  const handleNameInputFocus = () => {
+    if (formData.name.trim().length > 0 && filteredSuggestions.length > 0) {
+      setShowSuggestions(true)
+    }
+  }
+
+  const handleNameInputBlur = () => {
+    // Delay hiding suggestions to allow clicking on them
+    setTimeout(() => {
+      setShowSuggestions(false)
+    }, 200)
   }
 
 
@@ -122,6 +180,8 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
     })
     setImageFile(null)
     setImagePreview('')
+    setShowSuggestions(false)
+    setFilteredSuggestions([])
   }
 
   return (
@@ -149,20 +209,66 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
             </div>
 
             <form onSubmit={handleSubmit} className="space-y-4">
-              <div>
+              <div className="relative">
                 <label htmlFor="name" className="block text-sm font-medium text-gray-700">
                   Item Name *
                 </label>
                 <input
+                  ref={nameInputRef}
                   id="name"
                   name="name"
                   type="text"
                   required
                   value={formData.name}
                   onChange={handleInputChange}
+                  onFocus={handleNameInputFocus}
+                  onBlur={handleNameInputBlur}
                   className="input mt-1"
                   placeholder="Enter item name"
                 />
+                
+                {/* Search Suggestions Dropdown */}
+                {showSuggestions && filteredSuggestions.length > 0 && (
+                  <div className="absolute z-10 w-full mt-1 bg-white border border-gray-200 rounded-md shadow-lg max-h-60 overflow-auto">
+                    <div className="p-2 border-b border-gray-100">
+                      <div className="text-xs text-gray-500 font-medium">
+                        Existing items ({filteredSuggestions.length})
+                      </div>
+                    </div>
+                    {filteredSuggestions.map((item) => (
+                      <button
+                        key={item.id}
+                        type="button"
+                        onClick={() => handleSuggestionClick(item)}
+                        className="w-full text-left p-3 hover:bg-gray-50 border-b border-gray-100 last:border-b-0 transition-colors"
+                      >
+                        <div className="flex items-center space-x-3">
+                          <div className="flex-shrink-0">
+                            {item.imageUrl ? (
+                              <img
+                                src={item.imageUrl}
+                                alt={item.name}
+                                className="w-8 h-8 rounded object-cover"
+                              />
+                            ) : (
+                              <div className="w-8 h-8 rounded bg-gray-100 flex items-center justify-center">
+                                <Package className="h-4 w-4 text-gray-400" />
+                              </div>
+                            )}
+                          </div>
+                          <div className="flex-1 min-w-0">
+                            <div className="text-sm font-medium text-gray-900 truncate">
+                              {item.name}
+                            </div>
+                            <div className="text-xs text-gray-500">
+                              {item.category.name} • {item.quantity} in stock
+                            </div>
+                          </div>
+                        </div>
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
 
               <div>
@@ -202,35 +308,23 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
               </div>
 
               <div className="grid grid-cols-2 gap-4">
-                <div>
-                  <label htmlFor="quantity" className="block text-sm font-medium text-gray-700">
-                    Initial Quantity
-                  </label>
-                  <input
-                    id="quantity"
-                    name="quantity"
-                    type="number"
-                    min="0"
-                    value={formData.quantity}
-                    onChange={handleInputChange}
-                    className="input mt-1"
-                  />
-                </div>
+                <NumberStepper
+                  label="Initial Quantity"
+                  value={formData.quantity}
+                  onChange={(value) => setFormData(prev => ({ ...prev, quantity: value }))}
+                  min={0}
+                  max={999}
+                  step={1}
+                />
 
-                <div>
-                  <label htmlFor="threshold" className="block text-sm font-medium text-gray-700">
-                    Low Stock Threshold
-                  </label>
-                  <input
-                    id="threshold"
-                    name="threshold"
-                    type="number"
-                    min="1"
-                    value={formData.threshold}
-                    onChange={handleInputChange}
-                    className="input mt-1"
-                  />
-                </div>
+                <NumberStepper
+                  label="Low Stock Threshold"
+                  value={formData.threshold}
+                  onChange={(value) => setFormData(prev => ({ ...prev, threshold: value }))}
+                  min={1}
+                  max={999}
+                  step={1}
+                />
               </div>
 
               <div>
