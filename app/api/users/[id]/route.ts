@@ -1,9 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-import bcrypt from 'bcryptjs'
 import { getToken } from 'next-auth/jwt'
+import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
+// Supabase configuration
+const supabaseUrl = process.env.SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+// Helper function for Supabase queries
+async function fetchFromSupabase(query: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase query failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
+
+// Helper function for Supabase mutations
+async function mutateSupabase(endpoint: string, method: string, data?: any) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${endpoint}`, {
+    method,
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: data ? JSON.stringify(data) : undefined
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase mutation failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
 
 // PATCH /api/users/[id] - Update user
 export async function PATCH(
@@ -11,75 +50,63 @@ export async function PATCH(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Use getToken directly since getServerSession isn't working properly
     const token = await getToken({ req: request })
     
     if (!token?.id || token.role !== 'ADMIN') {
-      console.log('Users API PATCH - Unauthorized access attempt:', { 
-        hasToken: !!token, 
-        userId: token?.id, 
-        userRole: token?.role 
-      })
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 })
     }
 
-    console.log('Users API PATCH - Authorized access for user:', token.username, 'Role:', token.role)
+    const userId = (token.id || token.sub) as string
+    
+    // Get user to find their family
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
+    
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const user = users[0]
+    if (!user.familyId) {
+      return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
+    }
 
-    const { username, email, role, password } = await request.json()
-    const userId = params.id
+    const { username, email, role } = await request.json()
 
-    // Check if user exists
-    const existingUser = await prisma.user.findUnique({
-      where: { id: userId }
-    })
+    if (!username || !email) {
+      return NextResponse.json(
+        { error: 'Username and email are required' },
+        { status: 400 }
+      )
+    }
 
-    if (!existingUser) {
+    // Check if user exists and belongs to the same family
+    const existingUserResponse = await fetchFromSupabase(`app_users?id=eq.${params.id}&familyId=eq.${user.familyId}`)
+    const existingUsers = existingUserResponse as any[]
+    
+    if (!existingUsers || existingUsers.length === 0) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Check if username/email already exists (excluding current user)
-    if (username || email) {
-      const duplicateUser = await prisma.user.findFirst({
-        where: {
-          OR: [
-            ...(username ? [{ username }] : []),
-            ...(email ? [{ email }] : [])
-          ],
-          NOT: { id: userId }
-        }
-      })
-
-      if (duplicateUser) {
-        return NextResponse.json(
-          { error: 'Username or email already exists' },
-          { status: 400 }
-        )
-      }
+    // Check if username conflicts with another user in the same family
+    const duplicateUserResponse = await fetchFromSupabase(`app_users?username=eq.${username}&familyId=eq.${user.familyId}&id=neq.${params.id}`)
+    const duplicateUsers = duplicateUserResponse as any[]
+    
+    if (duplicateUsers && duplicateUsers.length > 0) {
+      return NextResponse.json(
+        { error: 'Username already exists in this family' },
+        { status: 400 }
+      )
     }
 
-    // Prepare update data
-    const updateData: any = {}
-    if (username) updateData.username = username
-    if (email) updateData.email = email
-    if (role) updateData.role = role
-    if (password) {
-      updateData.password = await bcrypt.hash(password, 12)
-    }
-
-    // Update user
-    const updatedUser = await prisma.user.update({
-      where: { id: userId },
-      data: updateData,
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        role: true,
-        createdAt: true,
-      }
+    // Update the user
+    const updatedUser = await mutateSupabase(`app_users?id=eq.${params.id}`, 'PATCH', {
+      username,
+      email,
+      role: role || 'USER'
     })
 
-    return NextResponse.json(updatedUser)
+    return NextResponse.json(updatedUser[0])
   } catch (error) {
     console.error('Error updating user:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -92,43 +119,45 @@ export async function DELETE(
   { params }: { params: { id: string } }
 ) {
   try {
-    // Use getToken directly since getServerSession isn't working properly
     const token = await getToken({ req: request })
     
     if (!token?.id || token.role !== 'ADMIN') {
-      console.log('Users API DELETE - Unauthorized access attempt:', { 
-        hasToken: !!token, 
-        userId: token?.id, 
-        userRole: token?.role 
-      })
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 })
     }
 
-    console.log('Users API DELETE - Authorized access for user:', token.username, 'Role:', token.role)
-
-    const userId = params.id
-
+    const userId = (token.id || token.sub) as string
+    
     // Prevent admin from deleting themselves
-    if (token.id === userId) {
+    if (params.id === userId) {
       return NextResponse.json(
         { error: 'Cannot delete your own account' },
         { status: 400 }
       )
     }
 
-    // Check if user exists
-    const existingUser = await prisma.user.findUnique({
-      where: { id: userId }
-    })
+    // Get user to find their family
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
+    
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const user = users[0]
+    if (!user.familyId) {
+      return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
+    }
 
-    if (!existingUser) {
+    // Check if user exists and belongs to the same family
+    const existingUserResponse = await fetchFromSupabase(`app_users?id=eq.${params.id}&familyId=eq.${user.familyId}`)
+    const existingUsers = existingUserResponse as any[]
+    
+    if (!existingUsers || existingUsers.length === 0) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
 
-    // Delete user
-    await prisma.user.delete({
-      where: { id: userId }
-    })
+    // Delete the user
+    await mutateSupabase(`app_users?id=eq.${params.id}`, 'DELETE')
 
     return NextResponse.json({ message: 'User deleted successfully' })
   } catch (error) {

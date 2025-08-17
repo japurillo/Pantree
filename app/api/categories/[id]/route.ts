@@ -1,8 +1,47 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
 import { getToken } from 'next-auth/jwt'
 
-const prisma = new PrismaClient()
+// Supabase configuration
+const supabaseUrl = process.env.SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+// Helper function for Supabase queries
+async function fetchFromSupabase(query: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase query failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
+
+// Helper function for Supabase mutations
+async function mutateSupabase(endpoint: string, method: string, data?: any) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${endpoint}`, {
+    method,
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: data ? JSON.stringify(data) : undefined
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase mutation failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
 
 // PATCH /api/categories/[id] - Update category
 export async function PATCH(
@@ -12,22 +51,23 @@ export async function PATCH(
   try {
     const token = await getToken({ req: request })
     
-    if (!token?.id && !token?.sub) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!token?.id || token.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 })
     }
 
     const userId = (token.id || token.sub) as string
     
     // Get user to find their family
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { family: true }
-    })
-
-    if (!user?.familyId || !user?.family) {
-      return NextResponse.json({ 
-        error: 'User not assigned to a family. Please contact your administrator.' 
-      }, { status: 400 })
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
+    
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const user = users[0]
+    if (!user.familyId) {
+      return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
     }
 
     const { name, description } = await request.json()
@@ -39,43 +79,35 @@ export async function PATCH(
       )
     }
 
-    // Check if category exists and belongs to user's family
-    const existingCategory = await prisma.category.findUnique({
-      where: { id: params.id }
+    // Verify the category exists and belongs to user's family
+    const existingCategoryResponse = await fetchFromSupabase(`categories?id=eq.${params.id}&familyId=eq.${user.familyId}`)
+    const existingCategories = existingCategoryResponse as any[]
+    
+    if (!existingCategories || existingCategories.length === 0) {
+      return NextResponse.json(
+        { error: 'Category not found or not accessible' },
+        { status: 404 }
+      )
+    }
+
+    // Check if name conflicts with another category in the same family
+    const conflictingCategoryResponse = await fetchFromSupabase(`categories?name=eq.${name}&familyId=eq.${user.familyId}&id=neq.${params.id}`)
+    const conflictingCategories = conflictingCategoryResponse as any[]
+    
+    if (conflictingCategories && conflictingCategories.length > 0) {
+      return NextResponse.json(
+        { error: 'Category name already exists in this family' },
+        { status: 400 }
+      )
+    }
+
+    // Update the category
+    const updatedCategory = await mutateSupabase(`categories?id=eq.${params.id}`, 'PATCH', {
+      name,
+      description: description || ''
     })
 
-    if (!existingCategory) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 })
-    }
-
-    if (existingCategory.familyId !== user.familyId) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 })
-    }
-
-    // Check if new name conflicts with existing categories in the same family
-    if (name !== existingCategory.name) {
-      const conflictingCategory = await prisma.category.findFirst({
-        where: { 
-          name,
-          familyId: user.familyId,
-          id: { not: params.id }
-        }
-      })
-
-      if (conflictingCategory) {
-        return NextResponse.json(
-          { error: 'A category with this name already exists in your family' },
-          { status: 400 }
-        )
-      }
-    }
-
-    const updatedCategory = await prisma.category.update({
-      where: { id: params.id },
-      data: { name, description }
-    })
-
-    return NextResponse.json(updatedCategory)
+    return NextResponse.json(updatedCategory[0])
   } catch (error) {
     console.error('Error updating category:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -90,52 +122,49 @@ export async function DELETE(
   try {
     const token = await getToken({ req: request })
     
-    if (!token?.id && !token?.sub) {
-      return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
+    if (!token?.id || token.role !== 'ADMIN') {
+      return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 })
     }
 
     const userId = (token.id || token.sub) as string
     
     // Get user to find their family
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { family: true }
-    })
-
-    if (!user?.familyId || !user?.family) {
-      return NextResponse.json({ 
-        error: 'User not assigned to a family. Please contact your administrator.' 
-      }, { status: 400 })
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
+    
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const user = users[0]
+    if (!user.familyId) {
+      return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
     }
 
-    // Check if category exists and belongs to user's family
-    const category = await prisma.category.findUnique({
-      where: { id: params.id }
-    })
-
-    if (!category) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 })
-    }
-
-    if (category.familyId !== user.familyId) {
-      return NextResponse.json({ error: 'Category not found' }, { status: 404 })
-    }
-
-    // Check if category has items (we might want to prevent deletion if it does)
-    const itemsInCategory = await prisma.item.count({
-      where: { categoryId: params.id }
-    })
-
-    if (itemsInCategory > 0) {
+    // Verify the category exists and belongs to user's family
+    const categoryResponse = await fetchFromSupabase(`categories?id=eq.${params.id}&familyId=eq.${user.familyId}`)
+    const categories = categoryResponse as any[]
+    
+    if (!categories || categories.length === 0) {
       return NextResponse.json(
-        { error: 'Cannot delete category that contains items. Please reassign or delete the items first.' },
+        { error: 'Category not found or not accessible' },
+        { status: 404 }
+      )
+    }
+
+    // Check if there are items in this category
+    const itemsInCategoryResponse = await fetchFromSupabase(`items?categoryId=eq.${params.id}&familyId=eq.${user.familyId}&select=id`)
+    const itemsInCategory = itemsInCategoryResponse as any[]
+    
+    if (itemsInCategory && itemsInCategory.length > 0) {
+      return NextResponse.json(
+        { error: 'Cannot delete category with existing items. Please move or delete the items first.' },
         { status: 400 }
       )
     }
 
-    await prisma.category.delete({
-      where: { id: params.id }
-    })
+    // Delete the category
+    await mutateSupabase(`categories?id=eq.${params.id}`, 'DELETE')
 
     return NextResponse.json({ message: 'Category deleted successfully' })
   } catch (error) {
