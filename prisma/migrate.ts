@@ -67,19 +67,11 @@ async function main() {
       })
     }
 
-    // Update existing categories to belong to default family
-    console.log('🔄 Updating existing categories...')
-    await prisma.category.updateMany({
-      where: { familyId: null },
-      data: { familyId: defaultFamily.id }
-    })
+    // Note: Categories should already have familyId since it's required in the schema
+    // If you have existing categories without familyId, you'll need to handle them differently
 
-    // Update existing items to belong to default family
-    console.log('📦 Updating existing items...')
-    await prisma.item.updateMany({
-      where: { familyId: null },
-      data: { familyId: defaultFamily.id }
-    })
+    // Note: Items should already have familyId since it's required in the schema
+    // If you have existing items without familyId, you'll need to handle them differently
 
     console.log('✅ Migration completed successfully!')
     console.log(`📊 Summary:`)
