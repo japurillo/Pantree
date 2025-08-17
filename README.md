@@ -1,309 +1,234 @@
-# PanTree - Smart Pantry Management
+# Grocie - Smart Pantry Management
 
-A modern, multi-tenant web application for managing pantry inventory with smart low-stock alerts, user management, and family-based isolation.
+A modern, family-focused pantry management application built with Next.js, Supabase, and Tailwind CSS.
 
-## 🚀 Features
+## 🚀 Key Features
 
-### Core Functionality
-- **Multi-Tenant Architecture**: Each admin has their own family group with isolated data
-- **Authentication System**: Username/password login with role-based access control
-- **Inventory Management**: Add, view, edit, consume, and delete pantry items
-- **Low Stock Dashboard**: Visual alerts for items below threshold
-- **Category Management**: Create, edit, and delete custom categories per family
-- **Image Upload & Optimization**: Cloudinary integration with automatic 400x400px optimization
-- **Search & Filter**: Find items by name, description, or category
-- **Mobile-First Design**: Responsive UI optimized for all devices
-
-### User Roles & Family System
-- **Admin Users**: Full access to user management, inventory, and categories within their family
-- **Regular Users**: Inventory management within their assigned family
-- **Family Isolation**: Each family has completely separate data, categories, and users
-- **No Cross-Family Access**: Admins cannot see other families' data
-
-### Technical Features
-- **Real-time Updates**: SWR for efficient data fetching and caching
-- **Secure API**: JWT-based authentication with NextAuth.js
-- **Database**: Supabase (PostgreSQL) with direct API calls
-- **Modern UI**: TailwindCSS with custom component system
-- **Image Optimization**: Client-side image resizing before upload
-- **Rate Limiting**: Built-in API rate limiting and protection
-- **Input Validation**: Zod-based schema validation
-- **Error Boundaries**: Graceful error handling throughout the app
+- **Smart Inventory Management**: Track items, set thresholds, and get low-stock alerts
+- **Family Collaboration**: Multiple users can manage shared pantry inventory
+- **Category Organization**: Organize items by storage location and type
+- **Image Support**: Upload and manage item images with Cloudinary
+- **Responsive Design**: Works seamlessly on desktop, tablet, and mobile
+- **Real-time Updates**: Instant synchronization across all family members
+- **Supabase (PostgreSQL)**: Robust database backend with direct API calls
+- **bcrypt Password Hashing**: Secure authentication for user accounts
 
 ## 🛠️ Tech Stack
 
-- **Frontend**: Next.js 14 (App Router), TypeScript, React Hooks
-- **Backend**: Next.js API Routes
-- **Database**: **Supabase (PostgreSQL)** with direct API calls
-- **Authentication**: NextAuth.js with JWT and bcrypt password hashing
-- **Styling**: TailwindCSS with custom utilities
-- **Image Storage**: Cloudinary API with automatic optimization
-- **Data Fetching**: SWR for caching and real-time updates
-- **Icons**: Lucide React, Heroicons
-- **Validation**: Zod schemas
-- **Utilities**: Custom hooks, error boundaries, loading states
-- **Security**: **Row Level Security (RLS)** for family-based data isolation
+- **Frontend**: Next.js 14, React, TypeScript, Tailwind CSS
+- **Backend**: Next.js API Routes, Supabase (PostgreSQL)
+- **Authentication**: NextAuth.js with bcrypt password hashing
+- **Database**: Supabase (PostgreSQL) with direct API calls
+- **Image Storage**: Cloudinary for optimized image management
+- **Data Fetching**: SWR for efficient data caching and synchronization
+- **Validation**: Zod for input validation and type safety
+- **Deployment**: Ready for Vercel, Netlify, or any Next.js-compatible platform
 
-## 📋 Prerequisites
+## 📁 Project Structure
 
-- Node.js 18+ 
-- **Supabase account** (free tier available)
-- Cloudinary account (for image uploads)
+```
+grocie/
+├── app/                    # Next.js 14 app directory
+│   ├── api/               # API routes
+│   ├── auth/              # Authentication pages
+│   ├── categories/        # Category management
+│   ├── inventory/         # Main inventory view
+│   ├── users/             # User management
+│   └── globals.css        # Global styles and Tailwind
+├── components/            # Reusable React components
+├── hooks/                 # Custom React hooks
+├── lib/                   # Utility functions and configurations
+│   └── supabase.ts       # Supabase client configuration
+├── types/                 # TypeScript type definitions
+└── public/                # Static assets
+```
+
+## 🗄️ Database Schema
+
+The application uses a PostgreSQL database with the following main tables:
+
+- **`families`**: Family groups with admin users
+- **`app_users`**: Application users (separate from Supabase auth)
+- **`categories`**: Item categories (Pantry, Refrigerator, Freezer, etc.)
+- **`items`**: Individual pantry items with quantities and thresholds
 
 ## 🚀 Quick Start
 
-### 1. Clone the Repository
+### Prerequisites
+
+- Node.js 18+ and npm
+- Supabase account and project
+- Cloudinary account (for image uploads)
+
+### 1. Clone and Install
+
 ```bash
 git clone <repository-url>
-cd pantree
-```
-
-### 2. Install Dependencies
-```bash
+cd grocie
 npm install
 ```
 
-### 3. Environment Setup
-Copy the example environment file and configure your variables:
+### 2. Environment Setup
+
+Copy `.env.example` to `.env.local` and configure:
+
 ```bash
-cp env.example .env.local
+cp .env.example .env.local
 ```
 
-Edit `.env.local` with your configuration:
+Required environment variables:
+
 ```env
-# Database (Supabase)
-SUPABASE_DB_PASSWORD="[YOUR-DATABASE-PASSWORD]"
-SUPABASE_PROJECT_REF="[YOUR-PROJECT-REF]"
-DATABASE_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${SUPABASE_PROJECT_REF}.supabase.co:5432/postgres"
-
-# NextAuth
-NEXTAUTH_SECRET="your-secret-key-here"
-NEXTAUTH_URL="http://localhost:3000"
-
-# Cloudinary
-CLOUDINARY_CLOUD_NAME="your-cloud-name"
-CLOUDINARY_API_KEY="your-api-key"
-CLOUDINARY_API_SECRET="your-api-secret"
-CLOUDINARY_FOLDER="pantree"
-# Note: Images will be stored in CLOUDINARY_FOLDER/username_of_admin/ structure
-# Example: pantree/jamtraxx/image1.jpg, pantree/another_admin/image2.jpg
-
 # Supabase Configuration
-SUPABASE_URL="https://${SUPABASE_PROJECT_REF}.supabase.co"
-SUPABASE_ANON_KEY="[YOUR-ANON-KEY]"
-SUPABASE_SERVICE_ROLE_KEY="[YOUR-SERVICE-ROLE-KEY]"
+SUPABASE_URL=your_supabase_project_url
+SUPABASE_ANON_KEY=your_supabase_anon_key
+SUPABASE_SERVICE_ROLE_KEY=your_supabase_service_role_key
+
+# NextAuth Configuration
+NEXTAUTH_SECRET=your_nextauth_secret
+NEXTAUTH_URL=http://localhost:3000
+
+# Cloudinary Configuration
+CLOUDINARY_CLOUD_NAME=your_cloudinary_cloud_name
+CLOUDINARY_API_KEY=your_cloudinary_api_key
+CLOUDINARY_API_SECRET=your_cloudinary_api_secret
 ```
 
-**📚 For detailed Supabase setup instructions, see [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)**
-```
+### 3. Database Setup
 
-### 4. Database Setup
+#### Option A: Using Supabase Dashboard (Recommended)
+
+1. Go to your Supabase project dashboard
+2. Navigate to the SQL Editor
+3. Run the database setup script (see `SUPABASE_SETUP.md` for details)
+
+#### Option B: Using psql Command Line
+
 ```bash
-# Database is managed through Supabase directly
-# No additional setup required
+# Connect to your Supabase database
+psql "postgresql://postgres.[project-ref]:[password]@[host]:[port]/postgres"
+
+# Run the setup script
+\i setup-database.sql
 ```
 
-**📚 For detailed Supabase setup instructions, see [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)**
+### 4. Initial Data Setup
 
-### 5. Run the Application
+After setting up the database schema, seed it with initial data:
+
+```sql
+-- Temporarily disable foreign key constraints
+SET session_replication_role = replica;
+
+-- Create admin family
+INSERT INTO families (id, name, "adminId") VALUES 
+('admin-family-001', 'Admin Family', 'temp-admin-id');
+
+-- Create admin user (password: admin123)
+INSERT INTO app_users (id, username, email, password, role, "familyId") VALUES 
+('admin-user-001', 'admin', 'admin@grocie.com', '$2a$12$ss0nu/g56JW2w3I9ORWUV.fqjfrveFpMHGWsunLpXOo4KDDCirHa2', 'ADMIN', 'admin-family-001');
+
+-- Update family adminId
+UPDATE families SET "adminId" = 'admin-user-001' WHERE id = 'admin-family-001';
+
+-- Create basic categories
+INSERT INTO categories (id, name, description, "familyId") VALUES 
+('cat-admin-001', 'Pantry', 'Dry goods and non-perishables', 'admin-family-001'),
+('cat-admin-002', 'Refrigerator', 'Cold items and leftovers', 'admin-family-001'),
+('cat-admin-003', 'Freezer', 'Frozen foods', 'admin-family-001'),
+('cat-admin-004', 'Spices', 'Herbs and seasonings', 'admin-family-001');
+
+-- Create sample item
+INSERT INTO items (id, name, description, quantity, threshold, notes, "categoryId", "createdBy", "familyId") VALUES 
+('item-admin-001', 'Black Pepper', 'Ground black pepper for seasoning', 1, 1, 'Sample item to get started', 'cat-admin-004', 'admin-user-001', 'admin-family-001');
+
+-- Re-enable foreign key constraints
+SET session_replication_role = DEFAULT;
+```
+
+### 5. Start Development Server
+
 ```bash
 npm run dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) in your browser.
+Visit `http://localhost:3000` and log in with:
+- **Username**: `admin`
+- **Password**: `admin123`
 
-## 🗄️ Database Schema
+## 🔐 Authentication
 
-### Family (Multi-Tenant)
-- `id`: Unique identifier
-- `name`: Family name
-- `adminId`: Admin user ID
-- `settings`: JSON configuration (thresholds, notifications, theme)
-- `createdAt`: Family creation timestamp
+The application uses NextAuth.js with a custom credentials provider:
 
-### Users
-- `id`: Unique identifier
-- `username`: Globally unique username
-- `email`: User email address
-- `password`: Hashed password
-- `role`: User role (USER/ADMIN)
-- `familyId`: Family membership
-- `createdAt`: Account creation timestamp
+- **User Registration**: New users automatically become admins of their own family
+- **Password Security**: All passwords are hashed using bcrypt with 12 salt rounds
+- **Session Management**: JWT-based sessions with automatic refresh
+- **Role-based Access**: Admin and User roles with appropriate permissions
 
-### Categories
-- `id`: Unique identifier
-- `name`: Category name (unique per family)
-- `description`: Optional category description
-- `familyId`: Family ownership
+## 📱 Features
 
-### Items
-- `id`: Unique identifier
-- `name`: Item name
-- `description`: Optional item description
-- `imageUrl`: Cloudinary image URL
-- `quantity`: Current stock quantity
-- `threshold`: Low stock threshold
-- `notes`: Additional notes
-- `categoryId`: Foreign key to category
-- `createdBy`: Foreign key to user
-- `familyId`: Family ownership
+### Inventory Management
+- Add, edit, and delete items
+- Set quantity thresholds for low-stock alerts
+- Organize items by categories
+- Upload and manage item images
 
-## 🔐 Authentication & Multi-Tenancy
+### Family Collaboration
+- Multiple users per family
+- Shared inventory across family members
+- Role-based permissions (Admin/User)
+- Real-time updates for all family members
 
-### User Registration
-- **Self-Registration**: New users can create accounts without admin approval
-- **Automatic Family Creation**: Each new user gets their own family and becomes admin
-- **Default Setup**: New families get default categories and sample items
-- **Global Username Uniqueness**: Usernames are unique across all families
+### Category System
+- Pre-configured categories (Pantry, Refrigerator, Freezer, Spices)
+- Custom category creation
+- Item organization by storage location
 
-### Family Isolation
-- **Data Separation**: Each family has completely isolated data
-- **Category Isolation**: Categories are family-specific
-- **User Isolation**: Users cannot be transferred between families
-- **Image Isolation**: Images stored in family-specific Cloudinary folders
+### User Management
+- Family member invitations
+- Role assignment and management
+- Secure password handling
+- User profile management
 
-### Security Features
-- **JWT Sessions**: Secure token-based authentication
-- **Role-based Access**: Different permissions for admins and users
-- **Row Level Security (RLS)**: Database-level family isolation
-- **Family Validation**: All API endpoints validate family membership
-- **Input Sanitization**: Protection against XSS and injection attacks
+## 🚀 Deployment
 
-## 📱 API Endpoints
+### Vercel (Recommended)
 
-### Authentication
-- `POST /api/auth/[...nextauth]` - NextAuth.js endpoints
-- `POST /api/auth/register` - User self-registration
+1. Push your code to GitHub
+2. Connect your repository to Vercel
+3. Configure environment variables
+4. Deploy automatically on push
 
-### Users
-- `GET /api/users` - List family users (admin only)
-- `POST /api/users` - Create new user in family
-- `PATCH /api/users/[id]` - Update user (admin only)
-- `DELETE /api/users/[id]` - Delete user (admin only)
+### Other Platforms
 
-### Items
-- `GET /api/items` - List family items (with search/filter)
-- `POST /api/items` - Create new item
-- `GET /api/items/[id]` - Get specific item
-- `PATCH /api/items/[id]` - Update item
-- `DELETE /api/items/[id]` - Delete item and associated image
-- `POST /api/items/[id]/consume` - Consume item (reduce quantity)
-
-### Categories
-- `GET /api/categories` - List family categories
-- `POST /api/categories` - Create new category
-- `PATCH /api/categories/[id]` - Update category
-- `DELETE /api/categories/[id]` - Delete category (if no items)
-
-### File Upload
-- `POST /api/upload` - Upload and optimize image to Cloudinary
-
-## 🎨 UI Components
-
-The application uses a comprehensive component system built with TailwindCSS:
-
-### Core Components
-- **Buttons**: Primary, secondary, success, danger variants
-- **Cards**: Consistent card layouts for items and information
-- **Inputs**: Styled form inputs with validation
-- **Badges**: Status indicators (success, warning, danger)
-- **Modals**: Reusable modal components for forms and confirmations
-
-### Specialized Components
-- **ImageUpload**: Drag & drop image upload with optimization
-- **NumberStepper**: Increment/decrement number inputs
-- **LoadingSpinner**: Loading indicators and skeletons
-- **ErrorBoundary**: Graceful error handling
-- **SharedSidebar**: Consistent navigation across pages
-
-### Mobile Optimization
-- **Responsive Grids**: 3-4 items per row on mobile
-- **Touch-Friendly**: Optimized button sizes and spacing
-- **Compact Layouts**: Efficient use of small screen space
-- **Mobile Navigation**: Collapsible sidebar for mobile
-
-## 📱 User Experience Features
-
-### Dashboard (`/`)
-- **Pantry Overview**: All items as clickable consumption cards
-- **Low Stock Alerts**: Visual indicators for urgent items
-- **Quick Stats**: Total items, low stock count, status overview
-- **Mobile Optimized**: Compact cards fitting 3 per row
-
-### Inventory Management (`/inventory`)
-- **Item Management**: Add, edit, delete, and view all items
-- **Category Management**: Organize items by custom categories
-- **Search & Filter**: Find items quickly
-- **Smart Sorting**: Items sorted by stock level urgency
-
-### Category Management (`/categories`)
-- **Family Categories**: Create and manage family-specific categories
-- **CRUD Operations**: Full create, read, update, delete functionality
-- **Validation**: Prevent deletion of categories with items
-
-### User Management (`/users`) - Admin Only
-- **Family Users**: Manage users within the family
-- **Role Management**: Assign admin or user roles
-- **User Creation**: Add new users to the family
-- **Security**: Prevent self-deletion
+The application is compatible with any platform that supports Next.js:
+- Netlify
+- Railway
+- DigitalOcean App Platform
+- AWS Amplify
 
 ## 🔧 Development
 
 ### Available Scripts
+
 ```bash
 npm run dev          # Start development server
 npm run build        # Build for production
 npm run start        # Start production server
 npm run lint         # Run ESLint
-# Database is managed through Supabase directly
-# No additional setup required
 ```
 
-### Project Structure
-```
-pantree/
-├── app/                    # Next.js app directory
-│   ├── api/               # API routes
-│   │   ├── auth/          # Authentication endpoints
-│   │   ├── categories/    # Category management
-│   │   ├── items/         # Item management
-│   │   ├── upload/        # Image upload
-│   │   └── users/         # User management
-│   ├── auth/              # Authentication pages
-│   ├── categories/        # Category management page
-│   ├── inventory/         # Inventory management page
-│   ├── users/             # User management page
-│   ├── globals.css        # Global styles
-│   ├── layout.tsx         # Root layout
-│   └── page.tsx           # Dashboard page
-├── components/             # React components
-│   ├── auth/              # Authentication components
-│   ├── ui/                # Reusable UI components
-│   └── ...                # Feature-specific components
-├── hooks/                  # Custom React hooks
-├── lib/                    # Utility libraries
-│   ├── imageOptimization.ts # Image processing utilities
-│   ├── rateLimit.ts       # Rate limiting
-│   ├── supabase.ts        # Supabase client configuration
-│   ├── validation.ts      # Input validation
-│   └── utils.ts           # General utilities
-├── types/                  # TypeScript types
-├── .env.local             # Environment variables
-└── package.json           # Dependencies
-```
+### Code Style
 
-## 🚀 Deployment
+- TypeScript for type safety
+- ESLint for code quality
+- Prettier for code formatting
+- Tailwind CSS for styling
 
-### Vercel (Recommended)
-1. Connect your GitHub repository to Vercel
-2. Set environment variables in Vercel dashboard
-3. Deploy automatically on push to main branch
+## 📚 Documentation
 
-### Other Platforms
-- Ensure environment variables are set
-- Run `npm run build` before deployment
-- Configure database connection for production
-- Set up Cloudinary credentials
+- **`SUPABASE_SETUP.md`**: Detailed Supabase setup instructions
+- **`VERSION.md`**: Project version history and changelog
 
 ## 🤝 Contributing
 
@@ -320,46 +245,10 @@ This project is licensed under the MIT License.
 ## 🆘 Support
 
 For support and questions:
-- Create an issue in the repository
-- Check the documentation
-- Review the code examples
+- Check the documentation files
+- Review the Supabase setup guide
+- Open an issue on GitHub
 
-## 🔮 Future Enhancements
+---
 
-- **Barcode Scanning**: Add items by scanning barcodes
-- **Shopping Lists**: Generate shopping lists from low stock items
-- **Expiration Tracking**: Track item expiration dates
-- **Recipe Integration**: Link items to recipes
-- **Analytics**: Usage patterns and insights
-- **Mobile App**: Native mobile applications
-- **Multi-language**: Internationalization support
-- **Notifications**: Push notifications for low stock alerts
-- **Export/Import**: Data backup and sharing
-- **API Integration**: Connect with grocery delivery services
-
-## 📊 Version History
-
-### v0.1.0 - Supabase Migration & Authentication Fixes
-- **Complete Prisma removal** and migration to Supabase
-- **Fixed authentication system** with proper password hashing
-- **Updated foreign key constraints** to use new `app_users` table
-- **Resolved item creation issues** and database constraints
-- **Clean project structure** with all migration artifacts removed
-- **Enhanced security** with bcrypt password hashing
-- **Improved database performance** with direct Supabase integration
-
-### v0.0.2 - Enhanced Functionality & Documentation
-- **Delete functionality** for inventory items with image cleanup
-- **Enhanced documentation** with comprehensive README
-- **Improved error handling** and user experience
-- **Better security** with enhanced family validation
-- **Performance improvements** with optimistic updates
-
-### v0.0.1 - Initial Release
-- **Multi-tenant architecture** with family-based isolation
-- **Complete inventory management** system
-- **User and category management** for admins
-- **Image upload and optimization** with Cloudinary
-- **Mobile-first responsive design**
-- **Comprehensive security features**
-- **Modern tech stack** with Next.js 14 and TypeScript
+**Grocie** - Making pantry management simple and collaborative for families everywhere.
