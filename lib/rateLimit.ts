@@ -6,9 +6,13 @@ interface RateLimitConfig {
   message?: string // Custom error message
 }
 
-class RateLimiter {
+export class RateLimiter {
   private requests: Map<string, { count: number; resetTime: number }> = new Map()
   private config: RateLimitConfig
+
+  getConfig(): RateLimitConfig {
+    return this.config
+  }
 
   constructor(config: RateLimitConfig) {
     this.config = config
@@ -43,11 +47,11 @@ class RateLimiter {
 
   cleanup(): void {
     const now = Date.now()
-    for (const [key, record] of this.requests.entries()) {
+    Array.from(this.requests.entries()).forEach(([key, record]) => {
       if (now > record.resetTime) {
         this.requests.delete(key)
       }
-    }
+    })
   }
 }
 
@@ -83,14 +87,14 @@ export function withRateLimit(
       const remainingTime = rateLimiter.getRemainingTime(identifier)
       return NextResponse.json(
         { 
-          error: rateLimiter.config.message || 'Rate limit exceeded',
+          error: rateLimiter.getConfig().message || 'Rate limit exceeded',
           retryAfter: Math.ceil(remainingTime / 1000)
         },
         { 
           status: 429,
           headers: {
             'Retry-After': Math.ceil(remainingTime / 1000).toString(),
-            'X-RateLimit-Limit': rateLimiter.config.maxRequests.toString(),
+            'X-RateLimit-Limit': rateLimiter.getConfig().maxRequests.toString(),
             'X-RateLimit-Remaining': '0',
             'X-RateLimit-Reset': new Date(Date.now() + remainingTime).toISOString()
           }

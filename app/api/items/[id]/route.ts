@@ -1,8 +1,40 @@
 import { NextRequest, NextResponse } from 'next/server'
 import { PrismaClient } from '@prisma/client'
 import { getToken } from 'next-auth/jwt'
+import { v2 as cloudinary } from 'cloudinary'
 
 const prisma = new PrismaClient()
+
+// Configure Cloudinary
+cloudinary.config({
+  cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
+  api_key: process.env.CLOUDINARY_API_KEY,
+  api_secret: process.env.CLOUDINARY_API_SECRET,
+})
+
+// Helper function to extract public ID from Cloudinary URL
+function extractPublicIdFromUrl(url: string): string | null {
+  try {
+    // Cloudinary URLs have the format: https://res.cloudinary.com/cloud_name/image/upload/v1234567890/folder/filename.jpg
+    const urlParts = url.split('/')
+    const uploadIndex = urlParts.findIndex(part => part === 'upload')
+    
+    if (uploadIndex === -1 || uploadIndex + 1 >= urlParts.length) {
+      return null
+    }
+    
+    // Skip the version number (v1234567890) and get the rest
+    const publicIdParts = urlParts.slice(uploadIndex + 2)
+    
+    // Remove the file extension
+    const publicId = publicIdParts.join('/').replace(/\.[^/.]+$/, '')
+    
+    return publicId
+  } catch (error) {
+    console.error('Error extracting public ID from URL:', error)
+    return null
+  }
+}
 
 // GET /api/items/[id] - Get specific item
 export async function GET(
@@ -144,6 +176,25 @@ export async function DELETE(
       return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     }
 
+    // Delete image from Cloudinary if it exists
+    if (item.imageUrl) {
+      try {
+        const publicId = extractPublicIdFromUrl(item.imageUrl)
+        if (publicId) {
+          console.log(`Deleting image from Cloudinary: ${publicId}`)
+          await cloudinary.uploader.destroy(publicId)
+          console.log(`Successfully deleted image: ${publicId}`)
+        } else {
+          console.warn(`Could not extract public ID from URL: ${item.imageUrl}`)
+        }
+      } catch (cloudinaryError) {
+        console.error('Error deleting image from Cloudinary:', cloudinaryError)
+        // Don't fail the entire operation if image deletion fails
+        // The item will still be deleted from the database
+      }
+    }
+
+    // Delete the item from the database
     await prisma.item.delete({
       where: { id: params.id }
     })

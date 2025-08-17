@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import Image from 'next/image'
-import { Package, AlertTriangle, Edit } from 'lucide-react'
+import { Package, AlertTriangle, Edit, Trash2 } from 'lucide-react'
 
 interface Item {
   id: string
@@ -20,9 +20,10 @@ interface Item {
 interface InventoryItemProps {
   item: Item
   onEdit: (item: Item) => void
+  onDelete: (item: Item) => void
 }
 
-export default function InventoryItem({ item, onEdit }: InventoryItemProps) {
+export default function InventoryItem({ item, onEdit, onDelete }: InventoryItemProps) {
   const isLowStock = item.quantity <= item.threshold
   const isOutOfStock = item.quantity === 0
 
@@ -70,11 +71,28 @@ export default function InventoryItem({ item, onEdit }: InventoryItemProps) {
           </div>
         )}
 
-        {/* Edit Icon */}
-        <div className="absolute bottom-1 sm:bottom-2 right-1 sm:right-2 opacity-0 group-hover:opacity-100 transition-opacity">
-          <div className="bg-white bg-opacity-90 p-1 rounded-full">
+        {/* Action Icons */}
+        <div className="absolute bottom-1 sm:bottom-2 right-1 sm:right-2 opacity-0 group-hover:opacity-100 transition-opacity flex space-x-1">
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onEdit(item)
+            }}
+            className="bg-white bg-opacity-90 p-1 rounded-full hover:bg-opacity-100 transition-all"
+            title="Edit item"
+          >
             <Edit className="h-4 w-4 text-primary-600" />
-          </div>
+          </button>
+          <button
+            onClick={(e) => {
+              e.stopPropagation()
+              onDelete(item)
+            }}
+            className="bg-white bg-opacity-90 p-1 rounded-full hover:bg-opacity-100 transition-all hover:bg-red-50"
+            title="Delete item"
+          >
+            <Trash2 className="h-4 w-4 text-red-500" />
+          </button>
         </div>
       </div>
 
