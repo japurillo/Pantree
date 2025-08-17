@@ -1,5 +1,62 @@
 # PanTree Version History
 
+## Version 0.0.2 - Enhanced Functionality & Documentation
+**Release Date**: January 2025
+
+### 🎯 Major Changes
+- **Delete Functionality**: Added ability to delete inventory items
+- **Image Cleanup**: Automatic Cloudinary image deletion when items are deleted
+- **Enhanced Documentation**: Comprehensive README updates
+- **Performance Improvements**: Better error handling and user experience
+
+### 🗑️ New Features
+- **Item Deletion**: Users can now delete items from their inventory
+- **Image Cleanup**: Automatic cleanup of Cloudinary images when items are deleted
+- **Delete Confirmation**: Beautiful confirmation modal with clear warnings
+- **Optimistic Updates**: UI updates immediately for better user experience
+
+### 🔧 Technical Enhancements
+- **Cloudinary Integration**: Enhanced image management with automatic cleanup
+- **Error Handling**: Improved error boundaries and user feedback
+- **API Security**: Better validation and family isolation checks
+- **TypeScript**: Enhanced type safety throughout the application
+
+### 📚 Documentation Updates
+- **README Overhaul**: Complete rewrite reflecting current project state
+- **Multi-Tenancy**: Detailed documentation of family-based architecture
+- **API Endpoints**: Comprehensive API documentation
+- **Setup Instructions**: Enhanced getting started guide
+- **Project Structure**: Updated file organization documentation
+
+### 🎨 UI/UX Improvements
+- **Delete Buttons**: Red trash icons on inventory item cards
+- **Confirmation Modals**: Professional delete confirmation dialogs
+- **Visual Feedback**: Clear indicators for destructive actions
+- **Mobile Optimization**: Enhanced mobile experience for all features
+
+### 🛡️ Security & Performance
+- **Family Validation**: Enhanced family isolation in all API endpoints
+- **Image Security**: Secure image deletion with proper error handling
+- **User Experience**: Better error messages and loading states
+- **Data Consistency**: Optimistic updates with proper error handling
+
+### 🚀 Getting Started
+1. Clone the repository
+2. Install dependencies: `npm install`
+3. Set up environment variables (see `env.example`)
+4. Set up database: `npm run db:generate && npm run db:push`
+5. Run migration: `npm run db:migrate`
+6. Run development server: `npm run dev`
+
+### 🌟 What's Next
+- Enhanced analytics and reporting
+- Notification system for low stock alerts
+- Bulk import/export functionality
+- API rate limiting and monitoring
+- Advanced family settings and configuration
+
+---
+
 ## Version 0.0.1 - Initial Release & Rebrand
 **Release Date**: January 2025
 
