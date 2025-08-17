@@ -25,9 +25,10 @@ interface Category {
 
 interface InventoryListProps {
   onEditItem: (item: Item) => void
+  onDeleteItem: (item: Item) => void
 }
 
-export default function InventoryList({ onEditItem }: InventoryListProps) {
+export default function InventoryList({ onEditItem, onDeleteItem }: InventoryListProps) {
   const { data: items = [], error } = useSWR<Item[]>('/api/items')
   const { data: categories = [] } = useSWR<Category[]>('/api/categories')
   
@@ -132,6 +133,7 @@ export default function InventoryList({ onEditItem }: InventoryListProps) {
               key={item.id} 
               item={item} 
               onEdit={onEditItem}
+              onDelete={onDeleteItem}
             />
           ))}
         </div>
