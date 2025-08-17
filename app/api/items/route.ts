@@ -1,8 +1,51 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
 import { getToken } from 'next-auth/jwt'
 
-const prisma = new PrismaClient()
+// Supabase configuration
+const supabaseUrl = process.env.SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+// Helper function for Supabase queries
+async function fetchFromSupabase(query: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase query failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
+
+// Helper function for Supabase mutations
+async function mutateSupabase(endpoint: string, method: string, data?: any) {
+  console.log('Supabase mutation:', { endpoint, method, data })
+  
+  const response = await fetch(`${supabaseUrl}/rest/v1/${endpoint}`, {
+    method,
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: data ? JSON.stringify(data) : undefined
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    console.error('Supabase mutation failed:', { status: response.status, statusText: response.statusText, error: errorText })
+    throw new Error(`Supabase mutation failed: ${response.status} ${response.statusText} - ${errorText}`)
+  }
+  
+  return response.json()
+}
 
 // GET /api/items - List all items
 export async function GET(request: NextRequest) {
@@ -15,17 +58,16 @@ export async function GET(request: NextRequest) {
 
     const userId = (token.id || token.sub) as string
     
-    // Get user to find their family
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { family: true }
-    })
-
-    if (!user) {
+    // Get user to find their family from app_users table
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
+    
+    if (!users || users.length === 0) {
       return NextResponse.json({ error: 'User not found' }, { status: 404 })
     }
-
-    if (!user.familyId || !user.family) {
+    
+    const user = users[0]
+    if (!user.familyId) {
       return NextResponse.json({ 
         error: 'User not assigned to a family. Please contact your administrator.' 
       }, { status: 400 })
@@ -35,28 +77,19 @@ export async function GET(request: NextRequest) {
     const category = searchParams.get('category')
     const search = searchParams.get('search')
 
-    const where: any = {
-      familyId: user.familyId // Only show items from user's family
-    }
+    let query = `items?familyId=eq.${user.familyId}&select=*,category:categories(name)&order=name.asc`
 
     if (category && category !== 'all') {
-      where.categoryId = category
+      query = `items?familyId=eq.${user.familyId}&categoryId=eq.${category}&select=*,category:categories(name)&order=name.asc`
     }
 
     if (search) {
-      where.OR = [
-        { name: { contains: search, mode: 'insensitive' } },
-        { description: { contains: search, mode: 'insensitive' } }
-      ]
+      // For search, we'll use a simpler approach with Supabase
+      query = `items?familyId=eq.${user.familyId}&or=(name.ilike.*${search}*,description.ilike.*${search}*)&select=*,category:categories(name)&order=name.asc`
     }
 
-    const items = await prisma.item.findMany({
-      where,
-      include: {
-        category: true,
-      },
-      orderBy: { name: 'asc' }
-    })
+    const itemsResponse = await fetchFromSupabase(query)
+    const items = itemsResponse as any[]
 
     return NextResponse.json(items)
   } catch (error) {
@@ -78,13 +111,16 @@ export async function POST(request: NextRequest) {
     const userId = (token.id || token.sub) as string
     console.log('Items API - Authorized access for user ID:', userId)
 
-    // Get user to find their family
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { family: true }
-    })
-
-    if (!user?.familyId) {
+    // Get user to find their family from app_users table
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
+    
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const user = users[0]
+    if (!user.familyId) {
       console.log('Items API - User not assigned to a family')
       return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
     }
@@ -99,41 +135,40 @@ export async function POST(request: NextRequest) {
     }
 
     // Verify the category exists and belongs to user's family
-    const category = await prisma.category.findUnique({
-      where: { 
-        id: categoryId,
-        familyId: user.familyId // Ensure category belongs to user's family
-      }
-    })
-
-    if (!category) {
-      return NextResponse.json(
-        { error: 'Category not found or not accessible' },
-        { status: 400 }
-      )
+    const categoryResponse = await fetchFromSupabase(`categories?id=eq.${categoryId}&familyId=eq.${user.familyId}`)
+    const categories = categoryResponse as any[]
+    
+    if (!categories || categories.length === 0) {
+      return NextResponse.json({ error: 'Invalid category' }, { status: 400 })
     }
 
-    console.log('Items API - Creating item with user ID:', userId, 'Family ID:', user.familyId)
+    // Check if item already exists in this family
+    const existingItemResponse = await fetchFromSupabase(`items?name=eq.${name}&familyId=eq.${user.familyId}`)
+    const existingItems = existingItemResponse as any[]
+    
+    if (existingItems && existingItems.length > 0) {
+      return NextResponse.json({ error: 'Item already exists in this family' }, { status: 400 })
+    }
 
-    const item = await prisma.item.create({
-      data: {
-        name,
-        description,
-        imageUrl,
-        quantity: quantity || 0,
-        threshold: threshold || 1,
-        notes,
-        categoryId,
-        createdBy: userId,
-        familyId: user.familyId // Assign item to user's family
-      },
-      include: {
-        category: true,
-      }
-    })
+    // Create the item - ensure all required fields are present
+    // Generate a simple ID for now (temporary fix until database schema is updated)
+    const newItem = {
+      id: `item_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+      name: name.trim(),
+      description: (description || '').trim(),
+      imageUrl: imageUrl || null,
+      quantity: parseInt(quantity) || 0,
+      threshold: parseInt(threshold) || 1,
+      notes: (notes || '').trim(),
+      categoryId: categoryId,
+      createdBy: userId,
+      familyId: user.familyId
+    }
 
-    console.log('Items API - Item created successfully:', item.id)
-    return NextResponse.json(item, { status: 201 })
+    console.log('Creating item with data:', newItem)
+    const createdItem = await mutateSupabase('items', 'POST', newItem)
+
+    return NextResponse.json(createdItem[0], { status: 201 })
   } catch (error) {
     console.error('Error creating item:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

@@ -1,9 +1,48 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
 import { getToken } from 'next-auth/jwt'
 import { v2 as cloudinary } from 'cloudinary'
 
-const prisma = new PrismaClient()
+// Supabase configuration
+const supabaseUrl = process.env.SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+// Helper function for Supabase queries
+async function fetchFromSupabase(query: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase query failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
+
+// Helper function for Supabase mutations
+async function mutateSupabase(endpoint: string, method: string, data?: any) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${endpoint}`, {
+    method,
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: data ? JSON.stringify(data) : undefined
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase mutation failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
 
 // Configure Cloudinary
 cloudinary.config({
@@ -14,24 +53,23 @@ cloudinary.config({
 
 // Helper function to extract public ID from Cloudinary URL
 function extractPublicIdFromUrl(url: string): string | null {
+  if (!url || !url.includes('cloudinary.com')) {
+    return null
+  }
+  
   try {
-    // Cloudinary URLs have the format: https://res.cloudinary.com/cloud_name/image/upload/v1234567890/folder/filename.jpg
     const urlParts = url.split('/')
     const uploadIndex = urlParts.findIndex(part => part === 'upload')
-    
-    if (uploadIndex === -1 || uploadIndex + 1 >= urlParts.length) {
+    if (uploadIndex === -1 || uploadIndex + 2 >= urlParts.length) {
       return null
     }
     
-    // Skip the version number (v1234567890) and get the rest
     const publicIdParts = urlParts.slice(uploadIndex + 2)
-    
-    // Remove the file extension
-    const publicId = publicIdParts.join('/').replace(/\.[^/.]+$/, '')
+    const publicId = publicIdParts.join('/').split('.')[0] // Remove file extension
     
     return publicId
   } catch (error) {
-    console.error('Error extracting public ID from URL:', error)
+    console.error('Error extracting public ID:', error)
     return null
   }
 }
@@ -51,32 +89,27 @@ export async function GET(
     const userId = (token.id || token.sub) as string
     
     // Get user to find their family
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { family: true }
-    })
-
-    if (!user?.familyId || !user?.family) {
-      return NextResponse.json({ 
-        error: 'User not assigned to a family. Please contact your administrator.' 
-      }, { status: 400 })
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
+    
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const user = users[0]
+    if (!user.familyId) {
+      return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
     }
 
-    const item = await prisma.item.findUnique({
-      where: { id: params.id },
-      include: { category: true }
-    })
-
-    if (!item) {
+    // Get the item with category information
+    const itemResponse = await fetchFromSupabase(`items?id=eq.${params.id}&familyId=eq.${user.familyId}&select=*,category:categories(name)`)
+    const items = itemResponse as any[]
+    
+    if (!items || items.length === 0) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     }
 
-    // Check if item belongs to user's family
-    if (item.familyId !== user.familyId) {
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
-    }
-
-    return NextResponse.json(item)
+    return NextResponse.json(items[0])
   } catch (error) {
     console.error('Error fetching item:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -98,39 +131,36 @@ export async function PATCH(
     const userId = (token.id || token.sub) as string
     
     // Get user to find their family
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { family: true }
-    })
-
-    if (!user?.familyId || !user?.family) {
-      return NextResponse.json({ 
-        error: 'User not assigned to a family. Please contact your administrator.' 
-      }, { status: 400 })
-    }
-
-    const item = await prisma.item.findUnique({
-      where: { id: params.id }
-    })
-
-    if (!item) {
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
-    }
-
-    // Check if item belongs to user's family
-    if (item.familyId !== user.familyId) {
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
-    }
-
-    const updates = await request.json()
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
     
-    const updatedItem = await prisma.item.update({
-      where: { id: params.id },
-      data: updates,
-      include: { category: true }
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const user = users[0]
+    if (!user.familyId) {
+      return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
+    }
+
+    const { quantity, threshold, notes } = await request.json()
+
+    // Verify the item exists and belongs to user's family
+    const existingItemResponse = await fetchFromSupabase(`items?id=eq.${params.id}&familyId=eq.${user.familyId}`)
+    const existingItems = existingItemResponse as any[]
+    
+    if (!existingItems || existingItems.length === 0) {
+      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
+    }
+
+    // Update the item
+    const updatedItem = await mutateSupabase(`items?id=eq.${params.id}`, 'PATCH', {
+      quantity: quantity || 0,
+      threshold: threshold || 1,
+      notes: notes || ''
     })
 
-    return NextResponse.json(updatedItem)
+    return NextResponse.json(updatedItem[0])
   } catch (error) {
     console.error('Error updating item:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
@@ -152,29 +182,27 @@ export async function DELETE(
     const userId = (token.id || token.sub) as string
     
     // Get user to find their family
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { family: true }
-    })
-
-    if (!user?.familyId || !user?.family) {
-      return NextResponse.json({ 
-        error: 'User not assigned to a family. Please contact your administrator.' 
-      }, { status: 400 })
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
+    
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const user = users[0]
+    if (!user.familyId) {
+      return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
     }
 
-    const item = await prisma.item.findUnique({
-      where: { id: params.id }
-    })
-
-    if (!item) {
+    // Get the item to check if it exists and get image URL
+    const itemResponse = await fetchFromSupabase(`items?id=eq.${params.id}&familyId=eq.${user.familyId}&select=*`)
+    const items = itemResponse as any[]
+    
+    if (!items || items.length === 0) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     }
 
-    // Check if item belongs to user's family
-    if (item.familyId !== user.familyId) {
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
-    }
+    const item = items[0]
 
     // Delete image from Cloudinary if it exists
     if (item.imageUrl) {
@@ -190,14 +218,11 @@ export async function DELETE(
       } catch (cloudinaryError) {
         console.error('Error deleting image from Cloudinary:', cloudinaryError)
         // Don't fail the entire operation if image deletion fails
-        // The item will still be deleted from the database
       }
     }
 
-    // Delete the item from the database
-    await prisma.item.delete({
-      where: { id: params.id }
-    })
+    // Delete the item
+    await mutateSupabase(`items?id=eq.${params.id}`, 'DELETE')
 
     return NextResponse.json({ message: 'Item deleted successfully' })
   } catch (error) {

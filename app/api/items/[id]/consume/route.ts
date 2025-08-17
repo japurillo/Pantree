@@ -1,10 +1,49 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
 import { getToken } from 'next-auth/jwt'
 
-const prisma = new PrismaClient()
+// Supabase configuration
+const supabaseUrl = process.env.SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// POST /api/items/[id]/consume - Consume item (reduce quantity)
+// Helper function for Supabase queries
+async function fetchFromSupabase(query: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase query failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
+
+// Helper function for Supabase mutations
+async function mutateSupabase(endpoint: string, method: string, data?: any) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${endpoint}`, {
+    method,
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: data ? JSON.stringify(data) : undefined
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase mutation failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
+
+// POST /api/items/[id]/consume - Consume an item
 export async function POST(
   request: NextRequest,
   { params }: { params: { id: string } }
@@ -13,76 +52,55 @@ export async function POST(
     const token = await getToken({ req: request })
     
     if (!token?.id && !token?.sub) {
-      console.log('Consume API - Unauthorized: No token or user ID')
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
     const userId = (token.id || token.sub) as string
-    console.log('Consume API - User ID:', userId)
     
     // Get user to find their family
-    const user = await prisma.user.findUnique({
-      where: { id: userId },
-      include: { family: true }
-    })
-
-    if (!user?.familyId || !user?.family) {
-      console.log('Consume API - User not assigned to a family')
-      return NextResponse.json({ 
-        error: 'User not assigned to a family. Please contact your administrator.' 
-      }, { status: 400 })
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
+    
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const user = users[0]
+    if (!user.familyId) {
+      return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
     }
 
     const { amount = 1 } = await request.json()
 
     if (amount <= 0) {
-      return NextResponse.json(
-        { error: 'Amount must be greater than 0' },
-        { status: 400 }
-      )
+      return NextResponse.json({ error: 'Amount must be greater than 0' }, { status: 400 })
     }
 
-    const item = await prisma.item.findUnique({
-      where: { id: params.id }
-    })
-
-    if (!item) {
+    // Get the item to check if it exists and get current quantity
+    const itemResponse = await fetchFromSupabase(`items?id=eq.${params.id}&familyId=eq.${user.familyId}&select=*`)
+    const items = itemResponse as any[]
+    
+    if (!items || items.length === 0) {
       return NextResponse.json({ error: 'Item not found' }, { status: 404 })
     }
 
-    // Check if item belongs to user's family
-    if (item.familyId !== user.familyId) {
-      console.log('Consume API - Item not in user family')
-      return NextResponse.json({ error: 'Item not found' }, { status: 404 })
-    }
+    const item = items[0]
 
+    // Check if there's enough quantity to consume
     if (item.quantity < amount) {
       return NextResponse.json(
-        { error: 'Not enough quantity available' },
+        { error: `Not enough quantity. Available: ${item.quantity}, Requested: ${amount}` },
         { status: 400 }
       )
     }
 
+    // Update the item quantity
     const newQuantity = Math.max(0, item.quantity - amount)
-    const isOutOfStock = newQuantity === 0
-
-    console.log('Consume API - Consuming item:', params.id, 'Amount:', amount, 'New quantity:', newQuantity)
-
-    const updatedItem = await prisma.item.update({
-      where: { id: params.id },
-      data: {
-        quantity: newQuantity,
-      },
-      include: { category: true }
+    const updatedItem = await mutateSupabase(`items?id=eq.${params.id}`, 'PATCH', {
+      quantity: newQuantity
     })
 
-    console.log('Consume API - Item consumed successfully')
-
-    return NextResponse.json({
-      ...updatedItem,
-      isOutOfStock,
-      consumedAmount: amount
-    })
+    return NextResponse.json(updatedItem[0])
   } catch (error) {
     console.error('Error consuming item:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

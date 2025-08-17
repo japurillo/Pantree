@@ -1,215 +1,156 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { PrismaClient } from '@prisma/client'
-import * as bcrypt from 'bcryptjs'
 import { getToken } from 'next-auth/jwt'
+import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
+// Supabase configuration
+const supabaseUrl = process.env.SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
 
-// GET /api/users - List all users (admin only)
+// Helper function for Supabase queries
+async function fetchFromSupabase(query: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase query failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
+
+// Helper function for Supabase mutations
+async function mutateSupabase(endpoint: string, method: string, data?: any) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${endpoint}`, {
+    method,
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    },
+    body: data ? JSON.stringify(data) : undefined
+  })
+  
+  if (!response.ok) {
+    const errorText = await response.text()
+    throw new Error(`Supabase mutation failed: ${response.status} ${response.statusText} - ${errorText}`)
+  }
+  
+  return response.json()
+}
+
+// GET /api/users - List all users in the family (admin only)
 export async function GET(request: NextRequest) {
   try {
-    // Use getToken directly since getServerSession isn't working properly
     const token = await getToken({ req: request })
     
     if (!token?.id || token.role !== 'ADMIN') {
-      console.log('Users API GET - Unauthorized access attempt:', { 
-        hasToken: !!token, 
-        userId: token?.id, 
-        userRole: token?.role 
-      })
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 })
     }
 
-    console.log('Users API GET - Authorized access for user:', token.username, 'Role:', token.role)
+    const userId = (token.id || token.sub) as string
+    
+    // Get user to find their family from app_users table
+    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
+    const users = userResponse as any[]
+    
+    if (!users || users.length === 0) {
+      return NextResponse.json({ error: 'User not found' }, { status: 404 })
+    }
+    
+    const user = users[0]
+    if (!user.familyId) {
+      return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
+    }
 
-    const users = await prisma.user.findMany({
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        role: true,
-        createdAt: true,
-      },
-      orderBy: { createdAt: 'desc' }
-    })
+    // Get all users in the same family from app_users table
+    const familyUsersResponse = await fetchFromSupabase(`app_users?familyId=eq.${user.familyId}&select=id,username,email,role,createdAt&order=username.asc`)
+    const familyUsers = familyUsersResponse as any[]
 
-    return NextResponse.json(users)
+    return NextResponse.json(familyUsers)
   } catch (error) {
     console.error('Error fetching users:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })
   }
 }
 
-// POST /api/users - Create new user
+// POST /api/users - Create a new user (admin only)
 export async function POST(request: NextRequest) {
   try {
-    // Use getToken directly since getServerSession isn't working properly
     const token = await getToken({ req: request })
     
     if (!token?.id || token.role !== 'ADMIN') {
-      console.log('Users API POST - Unauthorized access attempt:', { 
-        hasToken: !!token, 
-        userId: token?.id, 
-        userRole: token?.role 
-      })
       return NextResponse.json({ error: 'Unauthorized - Admin access required' }, { status: 401 })
     }
 
-    console.log('Users API POST - Authorized access for user:', token.username, 'Role:', token.role)
+    const adminUserId = (token.id || token.sub) as string
+    
+    // Get admin user to find their family from app_users table
+    const adminResponse = await fetchFromSupabase(`app_users?id=eq.${adminUserId}&select=familyId`)
+    const adminUsers = adminResponse as any[]
+    
+    if (!adminUsers || adminUsers.length === 0) {
+      return NextResponse.json({ error: 'Admin user not found' }, { status: 404 })
+    }
+    
+    const adminUser = adminUsers[0]
+    if (!adminUser.familyId) {
+      return NextResponse.json({ error: 'Admin user not assigned to a family' }, { status: 400 })
+    }
 
-    const { username, email, password, role = 'USER' } = await request.json()
+    // Parse request body
+    const body = await request.json()
+    const { username, email, password, role = 'USER' } = body
 
+    // Validate required fields
     if (!username || !email || !password) {
-      return NextResponse.json(
-        { error: 'Username, email, and password are required' },
-        { status: 400 }
-      )
+      return NextResponse.json({ 
+        error: 'Missing required fields: username, email, and password are required' 
+      }, { status: 400 })
     }
 
-    // Check if user already exists
-    const existingUser = await prisma.user.findFirst({
-      where: {
-        OR: [{ username }, { email }]
-      }
-    })
-
-    if (existingUser) {
-      return NextResponse.json(
-        { error: 'Username or email already exists' },
-        { status: 400 }
-      )
+    // Check if username already exists in app_users table
+    const existingUsernameResponse = await fetchFromSupabase(`app_users?username=eq.${username}`)
+    const existingUsername = existingUsernameResponse as any[]
+    
+    if (existingUsername && existingUsername.length > 0) {
+      return NextResponse.json({ error: 'Username already exists' }, { status: 409 })
     }
 
-    // Hash password
+    // Check if email already exists in app_users table
+    const existingEmailResponse = await fetchFromSupabase(`app_users?email=eq.${email}`)
+    const existingEmail = existingEmailResponse as any[]
+    
+    if (existingEmail && existingEmail.length > 0) {
+      return NextResponse.json({ error: 'Email already exists' }, { status: 409 })
+    }
+
+    // Hash the password before storing
     const hashedPassword = await bcrypt.hash(password, 12)
-
-    let userData: any = {
+    
+    // Create new user in app_users table
+    const newUser = {
       username,
       email,
       password: hashedPassword,
-      role: role as 'USER' | 'ADMIN',
+      role: role.toUpperCase(),
+      familyId: adminUser.familyId
     }
 
-    let newFamily: any = null
+    console.log('Creating user with data:', { ...newUser, password: '[REDACTED]' })
 
-    // If creating a new admin, create a new family
-    if (role === 'ADMIN') {
-      console.log('Creating new family for admin user:', username)
-      
-      // Create new family
-      newFamily = await prisma.family.create({
-        data: {
-          name: `${username}'s Family`,
-          settings: {
-            defaultThreshold: 1,
-            notifications: true,
-            theme: 'light'
-          }
-        }
-      })
-
-      // Create default categories for the new family
-      const defaultCategories = [
-        { name: 'Pantry', description: 'Dry goods and staples' },
-        { name: 'Refrigerator', description: 'Cold storage items' },
-        { name: 'Freezer', description: 'Frozen foods' },
-        { name: 'Spices', description: 'Herbs and seasonings' },
-        { name: 'Beverages', description: 'Drinks and liquids' }
-      ]
-
-      for (const category of defaultCategories) {
-        await prisma.category.create({
-          data: {
-            ...category,
-            familyId: newFamily.id
-          }
-        })
-      }
-
-      // Create sample items for the new family
-      const sampleItems = [
-        {
-          name: 'Rice',
-          description: 'Long grain white rice',
-          quantity: 5,
-          threshold: 2,
-          notes: 'Store in airtight container',
-          categoryName: 'Pantry'
-        },
-        {
-          name: 'Milk',
-          description: 'Whole milk',
-          quantity: 2,
-          threshold: 1,
-          notes: 'Check expiration date',
-          categoryName: 'Refrigerator'
-        },
-        {
-          name: 'Chicken Breast',
-          description: 'Boneless skinless chicken breast',
-          quantity: 3,
-          threshold: 2,
-          notes: 'Freeze if not using within 2 days',
-          categoryName: 'Freezer'
-        }
-      ]
-
-      for (const item of sampleItems) {
-        const category = await prisma.category.findFirst({
-          where: {
-            name: item.categoryName,
-            familyId: newFamily.id
-          }
-        })
-
-        if (category) {
-          await prisma.item.create({
-            data: {
-              name: item.name,
-              description: item.description,
-              quantity: item.quantity,
-              threshold: item.threshold,
-              notes: item.notes,
-              categoryId: category.id,
-              createdBy: token.id as string, // The creating admin
-              familyId: newFamily.id
-            }
-          })
-        }
-      }
-
-      // Set the new family as the admin's family
-      userData.familyId = newFamily.id
-
-      console.log('✅ New family created with sample items for admin:', username)
-    } else {
-      // Regular user gets assigned to the creating admin's family
-      userData.familyId = token.familyId
-    }
-
-    // Create user
-    const user = await prisma.user.create({
-      data: userData,
-      select: {
-        id: true,
-        username: true,
-        email: true,
-        role: true,
-        familyId: true,
-        createdAt: true,
-      }
-    })
-
-    // If this is a new admin user, update the family with the correct admin ID
-    if (role === 'ADMIN') {
-      await prisma.family.update({
-        where: { id: newFamily.id },
-        data: { adminId: user.id } // Use the new admin's ID, not the creating admin's ID
-      })
-      console.log('✅ Family admin updated with new admin ID:', user.id)
-    }
-
-    return NextResponse.json(user, { status: 201 })
+    const createdUser = await mutateSupabase('app_users', 'POST', newUser)
+    
+    // Return user data without password
+    const { password: _, ...userWithoutPassword } = createdUser[0]
+    
+    return NextResponse.json(userWithoutPassword, { status: 201 })
   } catch (error) {
     console.error('Error creating user:', error)
     return NextResponse.json({ error: 'Internal server error' }, { status: 500 })

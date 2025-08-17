@@ -1,9 +1,28 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
-import { PrismaClient } from '@prisma/client'
 import bcrypt from 'bcryptjs'
 
-const prisma = new PrismaClient()
+// Supabase configuration
+const supabaseUrl = process.env.SUPABASE_URL!
+const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
+
+// Helper function for Supabase queries
+async function fetchFromSupabase(query: string) {
+  const response = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
+    headers: {
+      'apikey': supabaseServiceKey,
+      'Authorization': `Bearer ${supabaseServiceKey}`,
+      'Content-Type': 'application/json',
+      'Prefer': 'return=representation'
+    }
+  })
+  
+  if (!response.ok) {
+    throw new Error(`Supabase query failed: ${response.statusText}`)
+  }
+  
+  return response.json()
+}
 
 const handler = NextAuth({
   providers: [
@@ -14,84 +33,69 @@ const handler = NextAuth({
         password: { label: 'Password', type: 'password' }
       },
       async authorize(credentials) {
-        console.log('NextAuth - Authorize called with:', credentials?.username)
-        
         if (!credentials?.username || !credentials?.password) {
-          console.log('NextAuth - Missing credentials')
           return null
         }
 
-        const user = await prisma.user.findUnique({
-          where: {
-            username: credentials.username
+        try {
+          // Find user by username from app_users table
+          const usersResponse = await fetchFromSupabase(`app_users?username=eq.${credentials.username}&select=*`)
+          const users = usersResponse as any[]
+          
+          if (!users || users.length === 0) {
+            return null
           }
-        })
 
-        if (!user) {
-          console.log('NextAuth - User not found:', credentials.username)
+          const user = users[0]
+          
+          // Verify password
+          const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
+          
+          if (!isPasswordValid) {
+            return null
+          }
+
+          return {
+            id: user.id,
+            username: user.username,
+            email: user.email,
+            role: user.role
+          }
+        } catch (error) {
+          console.error('Auth error:', error)
           return null
-        }
-
-        const isPasswordValid = await bcrypt.compare(
-          credentials.password,
-          user.password
-        )
-
-        if (!isPasswordValid) {
-          console.log('NextAuth - Invalid password for user:', credentials.username)
-          return null
-        }
-
-        console.log('NextAuth - User authenticated successfully:', user.username, 'Role:', user.role)
-        return {
-          id: user.id,
-          username: user.username,
-          email: user.email,
-          role: user.role,
         }
       }
     })
   ],
-  session: {
-    strategy: 'jwt'
-  },
   callbacks: {
     async jwt({ token, user }) {
-      console.log('NextAuth - JWT callback - Full token:', token)
-      console.log('NextAuth - JWT callback - User:', user)
-      
       if (user) {
         token.id = user.id
-        token.role = user.role
         token.username = user.username
-        console.log('NextAuth - JWT callback - Updated token:', token)
+        token.role = user.role
       }
       return token
     },
     async session({ session, token }) {
-      console.log('NextAuth - Session callback - Full token:', token)
-      console.log('NextAuth - Session callback - Initial session:', session)
-      
-      // Ensure we have a user object
-      if (!session.user) {
-        session.user = {} as any
+      if (token) {
+        // Ensure we have a user object
+        if (!session.user) {
+          session.user = {} as any
+        }
+        session.user.id = token.id as string
+        session.user.username = token.username as string
+        session.user.role = token.role as string
       }
-      
-      // Set all the custom fields with proper type assertions
-      session.user.id = (token.id || token.sub) as string
-      session.user.role = token.role as string
-      session.user.username = token.username as string
-      session.user.email = token.email as string
-      
-      console.log('NextAuth - Final session after setting fields:', session)
       return session
     }
   },
   pages: {
-    signIn: '/auth/signin',
+    signIn: '/auth/login'
   },
-  secret: process.env.NEXTAUTH_SECRET,
-  debug: true,
+  session: {
+    strategy: 'jwt'
+  }
 })
 
 export { handler as GET, handler as POST }
