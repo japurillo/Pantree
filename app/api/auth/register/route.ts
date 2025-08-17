@@ -54,6 +54,8 @@ export async function POST(request: NextRequest) {
       )
     }
 
+    console.log('Starting registration for:', username, email)
+
     // Check if user already exists in app_users table
     const existingUserResponse = await fetchFromSupabase(`app_users?or=(username.eq.${username},email.eq.${email})`)
     const existingUsers = existingUserResponse as any[]
@@ -67,62 +69,83 @@ export async function POST(request: NextRequest) {
 
     // Hash password
     const hashedPassword = await bcrypt.hash(password, 12)
+    console.log('Password hashed successfully')
 
-    // Create new family for this user
-    const newFamily = await mutateSupabase('families', 'POST', {
-      name: `${username}'s Family`
-      // Don't set adminId initially - will be updated after user creation
-    })
+    // Generate a unique family ID
+    const familyId = `family-${Date.now()}-${Math.random().toString(36).substr(2, 9)}`
+    console.log('Generated family ID:', familyId)
 
-    // Create new user as admin in app_users table
+    // Create new user as admin in app_users table (without familyId initially)
+    console.log('Creating user...')
     const newUser = await mutateSupabase('app_users', 'POST', {
       username: username.trim(),
       email: email.trim(),
       password: hashedPassword,
-      role: 'ADMIN',
-      familyId: newFamily[0].id
+      role: 'ADMIN'
+      // Don't set familyId yet
     })
+    console.log('User created successfully:', newUser[0].id)
 
-    // Update family with admin ID
-    await mutateSupabase(`families?id=eq.${newFamily[0].id}`, 'PATCH', {
+    // Create new family for this user
+    console.log('Creating family...')
+    const newFamily = await mutateSupabase('families', 'POST', {
+      id: familyId,
+      name: `${username}'s Family`,
       adminId: newUser[0].id
     })
+    console.log('Family created successfully:', newFamily[0].id)
+
+    // Update user with familyId
+    console.log('Updating user with familyId...')
+    await mutateSupabase(`app_users?id=eq.${newUser[0].id}`, 'PATCH', {
+      familyId: familyId
+    })
+    console.log('User updated with familyId successfully')
 
     // Create default categories for the new family
+    console.log('Creating default categories...')
     const defaultCategories = [
-      { name: 'Pantry', description: 'Dry goods and non-perishables', familyId: newFamily[0].id },
-      { name: 'Refrigerator', description: 'Cold items and leftovers', familyId: newFamily[0].id },
-      { name: 'Freezer', description: 'Frozen foods', familyId: newFamily[0].id },
-      { name: 'Spices', description: 'Herbs and seasonings', familyId: newFamily[0].id }
+      { id: `cat-${Date.now()}-1`, name: 'Pantry', description: 'Dry goods and non-perishables', familyId: familyId },
+      { id: `cat-${Date.now()}-2`, name: 'Refrigerator', description: 'Cold items and leftovers', familyId: familyId },
+      { id: `cat-${Date.now()}-3`, name: 'Freezer', description: 'Frozen foods', familyId: familyId },
+      { id: `cat-${Date.now()}-4`, name: 'Spices', description: 'Herbs and seasonings', familyId: familyId }
     ]
 
     for (const category of defaultCategories) {
+      console.log('Creating category:', category.name, 'with ID:', category.id)
       await mutateSupabase('categories', 'POST', {
+        id: category.id,
         name: category.name,
         description: category.description,
         familyId: category.familyId
       })
+      console.log('Category created:', category.name)
     }
 
     // Get the spices category to add a sample item
-    const spicesCategoryResponse = await fetchFromSupabase(`categories?name=eq.Spices&familyId=eq.${newFamily[0].id}`)
+    console.log('Getting spices category...')
+    const spicesCategoryResponse = await fetchFromSupabase(`categories?name=eq.Spices&familyId=eq.${familyId}`)
     const spicesCategories = spicesCategoryResponse as any[]
     
     if (spicesCategories && spicesCategories.length > 0) {
       const category = spicesCategories[0]
+      console.log('Found spices category, creating sample item...')
       
       // Add a sample item
       await mutateSupabase('items', 'POST', {
+        id: `item-${Date.now()}-sample`,
         name: 'Black Pepper',
         description: 'Ground black pepper for seasoning',
         quantity: 1,
         threshold: 1,
         categoryId: category.id,
         createdBy: newUser[0].id,
-        familyId: newFamily[0].id
+        familyId: familyId
       })
+      console.log('Sample item created successfully')
     }
 
+    console.log('Registration completed successfully')
     return NextResponse.json(
       { message: 'User registered successfully' },
       { status: 201 }
