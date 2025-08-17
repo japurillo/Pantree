@@ -23,7 +23,7 @@ A modern, multi-tenant web application for managing pantry inventory with smart 
 ### Technical Features
 - **Real-time Updates**: SWR for efficient data fetching and caching
 - **Secure API**: JWT-based authentication with NextAuth.js
-- **Database**: MySQL with Prisma ORM
+- **Database**: Supabase (PostgreSQL) with direct API calls
 - **Modern UI**: TailwindCSS with custom component system
 - **Image Optimization**: Client-side image resizing before upload
 - **Rate Limiting**: Built-in API rate limiting and protection
@@ -34,19 +34,20 @@ A modern, multi-tenant web application for managing pantry inventory with smart 
 
 - **Frontend**: Next.js 14 (App Router), TypeScript, React Hooks
 - **Backend**: Next.js API Routes
-- **Database**: MySQL with Prisma ORM
-- **Authentication**: NextAuth.js with JWT
+- **Database**: **Supabase (PostgreSQL)** with direct API calls
+- **Authentication**: NextAuth.js with JWT and bcrypt password hashing
 - **Styling**: TailwindCSS with custom utilities
 - **Image Storage**: Cloudinary API with automatic optimization
 - **Data Fetching**: SWR for caching and real-time updates
 - **Icons**: Lucide React, Heroicons
 - **Validation**: Zod schemas
 - **Utilities**: Custom hooks, error boundaries, loading states
+- **Security**: **Row Level Security (RLS)** for family-based data isolation
 
 ## 📋 Prerequisites
 
 - Node.js 18+ 
-- MySQL database
+- **Supabase account** (free tier available)
 - Cloudinary account (for image uploads)
 
 ## 🚀 Quick Start
@@ -70,8 +71,10 @@ cp env.example .env.local
 
 Edit `.env.local` with your configuration:
 ```env
-# Database
-DATABASE_URL="mysql://username:password@localhost:3306/pantree"
+# Database (Supabase)
+SUPABASE_DB_PASSWORD="[YOUR-DATABASE-PASSWORD]"
+SUPABASE_PROJECT_REF="[YOUR-PROJECT-REF]"
+DATABASE_URL="postgresql://postgres:${SUPABASE_DB_PASSWORD}@db.${SUPABASE_PROJECT_REF}.supabase.co:5432/postgres"
 
 # NextAuth
 NEXTAUTH_SECRET="your-secret-key-here"
@@ -84,22 +87,23 @@ CLOUDINARY_API_SECRET="your-api-secret"
 CLOUDINARY_FOLDER="pantree"
 # Note: Images will be stored in CLOUDINARY_FOLDER/username_of_admin/ structure
 # Example: pantree/jamtraxx/image1.jpg, pantree/another_admin/image2.jpg
+
+# Supabase Configuration
+SUPABASE_URL="https://${SUPABASE_PROJECT_REF}.supabase.co"
+SUPABASE_ANON_KEY="[YOUR-ANON-KEY]"
+SUPABASE_SERVICE_ROLE_KEY="[YOUR-SERVICE-ROLE-KEY]"
+```
+
+**📚 For detailed Supabase setup instructions, see [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)**
 ```
 
 ### 4. Database Setup
 ```bash
-# Generate Prisma client
-npm run db:generate
-
-# Push schema to database
-npm run db:push
-
-# Run initial migration for multi-tenancy
-npm run db:migrate
-
-# (Optional) Open Prisma Studio
-npm run db:studio
+# Database is managed through Supabase directly
+# No additional setup required
 ```
+
+**📚 For detailed Supabase setup instructions, see [SUPABASE_SETUP.md](./SUPABASE_SETUP.md)**
 
 ### 5. Run the Application
 ```bash
@@ -161,6 +165,7 @@ Open [http://localhost:3000](http://localhost:3000) in your browser.
 ### Security Features
 - **JWT Sessions**: Secure token-based authentication
 - **Role-based Access**: Different permissions for admins and users
+- **Row Level Security (RLS)**: Database-level family isolation
 - **Family Validation**: All API endpoints validate family membership
 - **Input Sanitization**: Protection against XSS and injection attacks
 
@@ -250,10 +255,8 @@ npm run dev          # Start development server
 npm run build        # Build for production
 npm run start        # Start production server
 npm run lint         # Run ESLint
-npm run db:generate  # Generate Prisma client
-npm run db:push      # Push schema to database
-npm run db:migrate   # Run database migration
-npm run db:studio    # Open Prisma Studio
+# Database is managed through Supabase directly
+# No additional setup required
 ```
 
 ### Project Structure
@@ -281,9 +284,9 @@ pantree/
 ├── lib/                    # Utility libraries
 │   ├── imageOptimization.ts # Image processing utilities
 │   ├── rateLimit.ts       # Rate limiting
+│   ├── supabase.ts        # Supabase client configuration
 │   ├── validation.ts      # Input validation
 │   └── utils.ts           # General utilities
-├── prisma/                 # Database schema and migrations
 ├── types/                  # TypeScript types
 ├── .env.local             # Environment variables
 └── package.json           # Dependencies
@@ -335,6 +338,15 @@ For support and questions:
 - **API Integration**: Connect with grocery delivery services
 
 ## 📊 Version History
+
+### v0.1.0 - Supabase Migration & Authentication Fixes
+- **Complete Prisma removal** and migration to Supabase
+- **Fixed authentication system** with proper password hashing
+- **Updated foreign key constraints** to use new `app_users` table
+- **Resolved item creation issues** and database constraints
+- **Clean project structure** with all migration artifacts removed
+- **Enhanced security** with bcrypt password hashing
+- **Improved database performance** with direct Supabase integration
 
 ### v0.0.2 - Enhanced Functionality & Documentation
 - **Delete functionality** for inventory items with image cleanup
