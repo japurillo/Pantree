@@ -70,7 +70,7 @@ export default function Dashboard() {
             <div className="space-y-2">
               <button
                 onClick={() => {
-                  router.push('/')
+                  router.push('/dashboard')
                   setSidebarOpen(false)
                 }}
                 className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md bg-primary-100 text-primary-700"
