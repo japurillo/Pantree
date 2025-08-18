@@ -29,7 +29,7 @@ export default function SharedSidebar({ currentPage, onClose }: SharedSidebarPro
     <nav className="mt-8 px-4">
       <div className="space-y-2">
         <button
-          onClick={() => handleNavigation('/')}
+          onClick={() => handleNavigation('/dashboard')}
           className={getButtonClass('dashboard')}
         >
           <BarChart3 className="mr-3 h-5 w-5" />

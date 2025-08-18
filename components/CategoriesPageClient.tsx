@@ -31,7 +31,7 @@ export default function CategoriesPageClient() {
                 <Menu className="h-6 w-6" />
               </button>
               <button
-                onClick={() => router.push('/')}
+                onClick={() => router.push('/dashboard')}
                 className="p-2 text-gray-400 hover:text-gray-500 hover:bg-gray-100 rounded-md mr-2"
               >
                 <ArrowLeft className="h-5 w-5" />
@@ -75,7 +75,7 @@ export default function CategoriesPageClient() {
             <div className="space-y-2">
               <button
                 onClick={() => {
-                  router.push('/')
+                  router.push('/dashboard')
                   setSidebarOpen(false)
                 }}
                 className="w-full flex items-center px-3 py-2 text-sm font-medium rounded-md text-gray-600 hover:bg-gray-50 hover:text-gray-900"

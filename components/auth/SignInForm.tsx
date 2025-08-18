@@ -27,7 +27,7 @@ export default function SignInForm() {
       if (result?.error) {
         setError('Invalid username or password')
       } else {
-        router.push('/')
+        router.push('/dashboard')
         router.refresh()
       }
     } catch (error) {
