@@ -1,4 +1,4 @@
-# Grocie - Smart Pantry Management
+# Pantree - Smart Pantry Management
 
 A modern, family-focused pantry management application built with Next.js, Supabase, and Tailwind CSS.
 
@@ -27,7 +27,7 @@ A modern, family-focused pantry management application built with Next.js, Supab
 ## 📁 Project Structure
 
 ```
-grocie/
+pantree/
 ├── app/                    # Next.js 14 app directory
 │   ├── api/               # API routes
 │   ├── auth/              # Authentication pages
@@ -64,7 +64,7 @@ The application uses a PostgreSQL database with the following main tables:
 
 ```bash
 git clone <repository-url>
-cd grocie
+cd pantree
 npm install
 ```
 
@@ -251,4 +251,4 @@ For support and questions:
 
 ---
 
-**Grocie** - Making pantry management simple and collaborative for families everywhere.
+**Pantree** - Making pantry management simple and collaborative for families everywhere.
