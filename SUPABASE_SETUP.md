@@ -1,6 +1,6 @@
-# Supabase Setup Guide for Grocie
+# Supabase Setup Guide for Pantree
 
-This guide will help you set up Supabase for the Grocie pantry management application.
+This guide will help you set up Supabase for the Pantree pantry management application.
 
 ## 🚀 Prerequisites
 
@@ -14,7 +14,7 @@ This guide will help you set up Supabase for the Grocie pantry management applic
 2. Click "New Project"
 3. Choose your organization
 4. Enter project details:
-   - **Name**: `grocie` (or your preferred name)
+   - **Name**: `pantree` (or your preferred name)
    - **Database Password**: Choose a strong password
    - **Region**: Select the region closest to your users
 5. Click "Create new project"
@@ -283,4 +283,4 @@ Once your Supabase setup is complete:
 3. **Customize categories** and add your own items
 4. **Deploy to production** when ready
 
-Your Grocie application is now ready to use! 🎉
+Your Pantree application is now ready to use! 🎉
