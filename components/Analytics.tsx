@@ -26,14 +26,33 @@ import {
 import { useRouter } from 'next/navigation'
 import useSWR from 'swr'
 
+interface Category {
+  id: string
+  name: string
+}
+
+interface Item {
+  id: string
+  name: string
+  quantity: number
+  threshold: number
+  imageUrl?: string
+  description?: string
+  notes?: string
+  category: {
+    id: string
+    name: string
+  }
+}
+
 export default function Analytics() {
   const { data: session } = useSession()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
   const isAdmin = session?.user?.role === 'ADMIN'
 
-  const { data: items = [] } = useSWR('/api/items')
-  const { data: categories = [] } = useSWR('/api/categories')
+  const { data: items = [] } = useSWR<Item[]>('/api/items')
+  const { data: categories = [] } = useSWR<Category[]>('/api/categories')
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/auth/signin' })
