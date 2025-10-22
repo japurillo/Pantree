@@ -143,7 +143,7 @@ export async function PATCH(
       return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
     }
 
-    const { quantity, threshold, notes } = await request.json()
+    const { quantity, threshold, notes, imageUrl } = await request.json()
 
     // Verify the item exists and belongs to user's family
     const existingItemResponse = await fetchFromSupabase(`items?id=eq.${params.id}&familyId=eq.${user.familyId}`)
@@ -154,11 +154,18 @@ export async function PATCH(
     }
 
     // Update the item
-    const updatedItem = await mutateSupabase(`items?id=eq.${params.id}`, 'PATCH', {
+    const updateData: any = {
       quantity: quantity || 0,
       threshold: threshold || 1,
       notes: notes || ''
-    })
+    }
+    
+    // Handle imageUrl - explicitly set to null if provided as null, otherwise keep existing
+    if (imageUrl !== undefined) {
+      updateData.imageUrl = imageUrl
+    }
+    
+    const updatedItem = await mutateSupabase(`items?id=eq.${params.id}`, 'PATCH', updateData)
 
     return NextResponse.json(updatedItem[0])
   } catch (error) {

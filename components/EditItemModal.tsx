@@ -1,8 +1,9 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { X, Save, Package, ChevronLeft, ChevronRight } from 'lucide-react'
+import { X, Save, Package, ChevronLeft, ChevronRight, Camera, Edit3 } from 'lucide-react'
 import useSWR, { mutate } from 'swr'
+import ImageUpload from './ui/ImageUpload'
 
 interface Category {
   id: string
@@ -35,6 +36,12 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+  const [isEditingImage, setIsEditingImage] = useState(false)
+  const [selectedImage, setSelectedImage] = useState<File | null>(null)
+  const [isUploadingImage, setIsUploadingImage] = useState(false)
+  const [isImageOptimizing, setIsImageOptimizing] = useState(false)
+  const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null)
+  const [imageRemoved, setImageRemoved] = useState(false)
 
   const { data: categories = [] } = useSWR<Category[]>('/api/categories')
 
@@ -44,6 +51,8 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
         quantity: item.quantity,
         threshold: item.threshold
       })
+      setCurrentImageUrl(item.imageUrl || null)
+      setImageRemoved(false)
     }
   }, [item])
 
@@ -67,6 +76,105 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
     setFormData(prev => ({ ...prev, threshold: prev.threshold + 1 }))
   }
 
+  const handleImageSelect = (file: File) => {
+    setSelectedImage(file)
+  }
+
+  const handleImageRemove = () => {
+    setSelectedImage(null)
+    setCurrentImageUrl(null)
+    setImageRemoved(true)
+  }
+
+  const extractPublicIdFromUrl = (url: string): string | null => {
+    if (!url || !url.includes('cloudinary.com')) {
+      return null
+    }
+    
+    try {
+      const urlParts = url.split('/')
+      const uploadIndex = urlParts.findIndex(part => part === 'upload')
+      if (uploadIndex === -1 || uploadIndex + 2 >= urlParts.length) {
+        return null
+      }
+      
+      const publicIdParts = urlParts.slice(uploadIndex + 2)
+      const publicId = publicIdParts.join('/').split('.')[0] // Remove file extension
+      
+      return publicId
+    } catch (error) {
+      console.error('Error extracting public ID:', error)
+      return null
+    }
+  }
+
+  const deleteImageFromCloudinary = async (imageUrl: string) => {
+    try {
+      // Extract public ID from Cloudinary URL using the same logic as the API
+      const publicId = extractPublicIdFromUrl(imageUrl)
+      
+      if (!publicId) {
+        throw new Error('Invalid Cloudinary URL - could not extract public ID')
+      }
+      
+      const response = await fetch('/api/items/delete-image', {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({ publicId })
+      })
+
+      if (!response.ok) {
+        const errorData = await response.json()
+        throw new Error(`Failed to delete image from Cloudinary: ${errorData.error || 'Unknown error'}`)
+      }
+    } catch (error) {
+      console.error('Error deleting image from Cloudinary:', error)
+      throw error
+    }
+  }
+
+  const handleImageEdit = () => {
+    setIsEditingImage(true)
+  }
+
+  const handleImageEditCancel = () => {
+    setIsEditingImage(false)
+    setSelectedImage(null)
+    setImageRemoved(false)
+    // Reset to original image
+    setCurrentImageUrl(item?.imageUrl || null)
+  }
+
+  const uploadImage = async (file: File): Promise<string> => {
+    console.log('EditItemModal: Starting image upload for file:', file.name, 'Size:', file.size, 'bytes')
+    const formData = new FormData()
+    formData.append('file', file)
+
+    try {
+      const response = await fetch('/api/upload', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      })
+
+      if (response.ok) {
+        const data = await response.json()
+        console.log('EditItemModal: Image upload successful:', data.url)
+        return data.url
+      } else {
+        const errorData = await response.json()
+        console.error('EditItemModal: Upload failed:', errorData)
+        throw new Error(errorData.error || 'Upload failed')
+      }
+    } catch (error) {
+      console.error('EditItemModal: Error uploading image:', error)
+      throw error
+    }
+  }
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!item) return
@@ -75,6 +183,33 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
     setError('')
 
     try {
+      let imageUrl = item.imageUrl
+
+      // Handle image changes
+      if (selectedImage) {
+        // Upload new image
+        setIsUploadingImage(true)
+        try {
+          imageUrl = await uploadImage(selectedImage)
+        } catch (error) {
+          setError(error instanceof Error ? error.message : 'Failed to upload image')
+          setIsLoading(false)
+          setIsUploadingImage(false)
+          return
+        }
+        setIsUploadingImage(false)
+      } else if (imageRemoved && item.imageUrl) {
+        // Image was removed - delete from Cloudinary and set to null
+        try {
+          await deleteImageFromCloudinary(item.imageUrl)
+          imageUrl = null
+        } catch (error) {
+          console.error('Failed to delete image from Cloudinary:', error)
+          // Continue with the update even if Cloudinary deletion fails
+          imageUrl = null
+        }
+      }
+
       const response = await fetch(`/api/items/${item.id}`, {
         method: 'PATCH',
         headers: {
@@ -83,11 +218,23 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
         credentials: 'include',
         body: JSON.stringify({
           quantity: parseInt(formData.quantity.toString()),
-          threshold: parseInt(formData.threshold.toString())
+          threshold: parseInt(formData.threshold.toString()),
+          imageUrl: imageUrl
         }),
       })
 
       if (response.ok) {
+        // Update the local image URL to show the new image immediately
+        if (selectedImage && imageUrl) {
+          setCurrentImageUrl(imageUrl)
+        } else if (imageRemoved) {
+          setCurrentImageUrl(null)
+        }
+        
+        // Reset states
+        setImageRemoved(false)
+        setSelectedImage(null)
+        
         // Refresh the items data
         mutate('/api/items')
         onClose()
@@ -96,7 +243,8 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
         setError(data.error || 'Failed to update item')
       }
     } catch (error) {
-      setError('An error occurred while updating the item')
+      console.error('Error updating item:', error)
+      setError(error instanceof Error ? error.message : 'An error occurred while updating the item')
     } finally {
       setIsLoading(false)
     }
@@ -132,23 +280,61 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
             {/* Item Info */}
             <div className="mb-6 p-4 bg-gray-50 rounded-lg">
               <div className="flex items-center space-x-3">
-                {item.imageUrl ? (
-                  <img 
-                    src={item.imageUrl} 
-                    alt={item.name}
-                    className="w-12 h-12 object-cover rounded-lg"
-                  />
-                ) : (
-                  <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
-                    <Package className="h-6 w-6 text-gray-400" />
-                  </div>
-                )}
+                <div className="relative group">
+                  {currentImageUrl ? (
+                    <img 
+                      src={currentImageUrl} 
+                      alt={item.name}
+                      className="w-12 h-12 object-cover rounded-lg"
+                    />
+                  ) : (
+                    <div className="w-12 h-12 bg-gray-200 rounded-lg flex items-center justify-center">
+                      <Package className="h-6 w-6 text-gray-400" />
+                    </div>
+                  )}
+                  {/* Edit Image Overlay */}
+                  <button
+                    onClick={handleImageEdit}
+                    className="absolute inset-0 bg-black bg-opacity-50 rounded-lg flex items-center justify-center opacity-0 group-hover:opacity-100 transition-opacity duration-200"
+                    title="Edit image"
+                  >
+                    <Edit3 className="h-4 w-4 text-white" />
+                  </button>
+                </div>
                 <div>
                   <p className="font-medium text-gray-900">{item.name}</p>
                   <p className="text-sm text-gray-500">{item.category.name}</p>
                 </div>
               </div>
             </div>
+
+            {/* Image Editing Section */}
+            {isEditingImage && (
+              <div className="mb-6 p-4 bg-blue-50 rounded-lg border border-blue-200">
+                <div className="flex items-center justify-between mb-4">
+                  <h4 className="text-sm font-medium text-blue-900 flex items-center">
+                    <Camera className="h-4 w-4 mr-2" />
+                    Edit Item Image
+                  </h4>
+                  <button
+                    type="button"
+                    onClick={handleImageEditCancel}
+                    className="text-blue-600 hover:text-blue-800 text-sm"
+                  >
+                    Cancel
+                  </button>
+                </div>
+                <ImageUpload
+                  onImageSelect={handleImageSelect}
+                  onImageRemove={handleImageRemove}
+                  selectedImage={selectedImage ? URL.createObjectURL(selectedImage) : currentImageUrl}
+                  className="max-w-sm"
+                  autoOptimize={true}
+                  onOptimizationStart={() => setIsImageOptimizing(true)}
+                  onOptimizationComplete={() => setIsImageOptimizing(false)}
+                />
+              </div>
+            )}
 
             {/* Form */}
             <form onSubmit={handleSubmit} className="space-y-6">
@@ -251,13 +437,16 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
                 </button>
                 <button
                   type="submit"
-                  disabled={isLoading}
+                  disabled={isLoading || isUploadingImage || isImageOptimizing}
                   className="px-4 py-2 text-sm font-medium text-white bg-primary-600 hover:bg-primary-700 rounded-md transition-colors disabled:opacity-50 disabled:cursor-not-allowed flex items-center space-x-2"
                 >
-                  {isLoading ? (
+                  {isLoading || isUploadingImage || isImageOptimizing ? (
                     <>
                       <div className="animate-spin rounded-full h-4 w-4 border-b-2 border-white"></div>
-                      <span>Saving...</span>
+                      <span>
+                        {isImageOptimizing ? 'Optimizing image...' : 
+                         isUploadingImage ? 'Uploading image...' : 'Saving...'}
+                      </span>
                     </>
                   ) : (
                     <>
