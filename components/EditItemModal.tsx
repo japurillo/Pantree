@@ -154,6 +154,7 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
     formData.append('file', file)
 
     try {
+      // Try regular upload first
       const response = await fetch('/api/upload', {
         method: 'POST',
         credentials: 'include',
@@ -166,12 +167,53 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
         return data.url
       } else {
         const errorData = await response.json()
-        console.error('EditItemModal: Upload failed:', errorData)
+        console.error('EditItemModal: Regular upload failed:', errorData)
+        
+        // If it's a timeout error, try direct upload
+        if (response.status === 504 || response.status === 408 || errorData.error?.includes('timeout')) {
+          console.log('EditItemModal: Trying direct upload as fallback')
+          return await uploadImageDirect(file)
+        }
+        
         throw new Error(errorData.error || 'Upload failed')
       }
     } catch (error) {
       console.error('EditItemModal: Error uploading image:', error)
+      
+      // If it's a network error or timeout, try direct upload
+      if (error instanceof Error && (error.message.includes('timeout') || error.message.includes('fetch'))) {
+        console.log('EditItemModal: Trying direct upload as fallback')
+        try {
+          return await uploadImageDirect(file)
+        } catch (directError) {
+          console.error('EditItemModal: Direct upload also failed:', directError)
+          throw new Error('Both upload methods failed. Please try again with a smaller image.')
+        }
+      }
+      
       throw error
+    }
+  }
+
+  const uploadImageDirect = async (file: File): Promise<string> => {
+    console.log('EditItemModal: Trying direct upload for file:', file.name)
+    const formData = new FormData()
+    formData.append('file', file)
+
+    const response = await fetch('/api/upload-direct', {
+      method: 'POST',
+      credentials: 'include',
+      body: formData,
+    })
+
+    if (response.ok) {
+      const data = await response.json()
+      console.log('EditItemModal: Direct upload successful:', data.url)
+      return data.url
+    } else {
+      const errorData = await response.json()
+      console.error('EditItemModal: Direct upload failed:', errorData)
+      throw new Error(errorData.error || 'Direct upload failed')
     }
   }
 

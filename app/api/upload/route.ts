@@ -33,6 +33,8 @@ cloudinary.config({
 
 export async function POST(request: NextRequest) {
   try {
+    console.log('Upload API: Starting upload process')
+    
     const token = await getToken({ req: request })
     
     if (!token?.id && !token?.sub) {
@@ -40,6 +42,7 @@ export async function POST(request: NextRequest) {
     }
 
     const userId = (token.id || token.sub) as string
+    console.log('Upload API: User ID:', userId)
     
     // Get user to find their family
     const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
@@ -54,6 +57,8 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
     }
 
+    console.log('Upload API: User family ID:', user.familyId)
+
     const formData = await request.formData()
     const file = formData.get('file') as File
 
@@ -61,36 +66,68 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'No file provided' }, { status: 400 })
     }
 
+    console.log('Upload API: File received:', file.name, 'Size:', file.size, 'bytes')
+
+    // Check file size (limit to 10MB)
+    const maxSize = 10 * 1024 * 1024 // 10MB
+    if (file.size > maxSize) {
+      return NextResponse.json({ error: 'File too large. Maximum size is 10MB.' }, { status: 400 })
+    }
+
     // Convert file to buffer
+    console.log('Upload API: Converting file to buffer')
     const bytes = await file.arrayBuffer()
     const buffer = Buffer.from(bytes)
 
-    // Upload to Cloudinary with family-specific folder
+    // Upload to Cloudinary with timeout
     const folder = process.env.CLOUDINARY_FOLDER || 'pantree'
     const username = token.username || 'unknown'
     
-    const result = await new Promise((resolve, reject) => {
-      cloudinary.uploader.upload_stream(
-        {
-          folder: `${folder}/${username}`,
-          transformation: [
-            { width: 400, height: 400, crop: 'limit' },
-            { quality: 'auto', fetch_format: 'auto' }
-          ]
-        },
-        (error, result) => {
-          if (error) reject(error)
-          else resolve(result)
-        }
-      ).end(buffer)
-    })
+    console.log('Upload API: Starting Cloudinary upload to folder:', `${folder}/${username}`)
+    
+    const result = await Promise.race([
+      new Promise((resolve, reject) => {
+        cloudinary.uploader.upload_stream(
+          {
+            folder: `${folder}/${username}`,
+            transformation: [
+              { width: 400, height: 400, crop: 'limit' },
+              { quality: 'auto', fetch_format: 'auto' }
+            ]
+          },
+          (error, result) => {
+            if (error) {
+              console.error('Upload API: Cloudinary error:', error)
+              reject(error)
+            } else {
+              console.log('Upload API: Cloudinary upload successful')
+              resolve(result)
+            }
+          }
+        ).end(buffer)
+      }),
+      new Promise((_, reject) => {
+        setTimeout(() => {
+          reject(new Error('Upload timeout after 30 seconds'))
+        }, 30000) // 30 second timeout
+      })
+    ])
 
+    console.log('Upload API: Upload completed successfully')
     return NextResponse.json({
       url: (result as any).secure_url,
       publicId: (result as any).public_id
     })
   } catch (error) {
-    console.error('Upload error:', error)
-    return NextResponse.json({ error: 'Upload failed' }, { status: 500 })
+    console.error('Upload API: Upload error:', error)
+    
+    if (error instanceof Error && error.message.includes('timeout')) {
+      return NextResponse.json({ error: 'Upload timeout. Please try again with a smaller image.' }, { status: 408 })
+    }
+    
+    return NextResponse.json({ 
+      error: 'Upload failed', 
+      details: error instanceof Error ? error.message : 'Unknown error'
+    }, { status: 500 })
   }
 }
