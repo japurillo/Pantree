@@ -183,7 +183,7 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
     setError('')
 
     try {
-      let imageUrl = item.imageUrl
+      let imageUrl: string | null = item.imageUrl || null
 
       // Handle image changes
       if (selectedImage) {
