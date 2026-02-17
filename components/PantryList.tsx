@@ -2,7 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import { Search, Filter } from 'lucide-react'
-import useSWR from 'swr'
+import { useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
+import { useSession } from 'next-auth/react'
 import PantryItem from './PantryItem'
 
 interface Item {
@@ -24,9 +27,11 @@ interface Category {
 }
 
 export default function PantryList() {
-  const { data: items = [], error } = useSWR<Item[]>('/api/items')
-  const { data: categories = [] } = useSWR<Category[]>('/api/categories')
-  
+  const { data: session } = useSession()
+  const userId = session?.user?.id as Id<"users"> | undefined
+  const items = useQuery(api.items.listItems, userId ? { userId } : "skip") ?? []
+  const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
+
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
@@ -35,16 +40,16 @@ export default function PantryList() {
       const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                           (item.notes && item.notes.toLowerCase().includes(searchTerm.toLowerCase()))
       const matchesCategory = selectedCategory === 'all' || item.category.id === selectedCategory
-      
+
       return matchesSearch && matchesCategory
     })
   }, [items, searchTerm, selectedCategory])
 
-  if (error) {
+  if (items === undefined) {
     return (
       <div className="card">
         <div className="text-center text-gray-500">
-          Error loading pantry items
+          Loading pantry items...
         </div>
       </div>
     )
@@ -64,7 +69,7 @@ export default function PantryList() {
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
-        
+
         <div className="relative">
           <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <select
@@ -95,7 +100,7 @@ export default function PantryList() {
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No items found</h3>
           <p className="text-gray-500">
-            {searchTerm || selectedCategory !== 'all' 
+            {searchTerm || selectedCategory !== 'all'
               ? 'Try adjusting your search or filter criteria'
               : 'Add some items to get started'
             }

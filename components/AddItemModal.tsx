@@ -2,7 +2,10 @@
 
 import { useState, useEffect, useRef } from 'react'
 import { X, Plus, Search, Package } from 'lucide-react'
-import useSWR, { mutate } from 'swr'
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
+import { useSession } from 'next-auth/react'
 import ImageUpload from './ui/ImageUpload'
 import NumberStepper from './ui/NumberStepper'
 
@@ -31,6 +34,9 @@ interface AddItemModalProps {
 }
 
 export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
+  const { data: session } = useSession()
+  const userId = session?.user?.id as Id<"users"> | undefined
+
   const [formData, setFormData] = useState({
     name: '',
     description: '',
@@ -47,8 +53,9 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
   const [filteredSuggestions, setFilteredSuggestions] = useState<Item[]>([])
   const nameInputRef = useRef<HTMLInputElement>(null)
 
-  const { data: categories = [] } = useSWR<Category[]>('/api/categories')
-  const { data: existingItems = [] } = useSWR<Item[]>('/api/items')
+  const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
+  const existingItems = useQuery(api.items.listItems, userId ? { userId } : "skip") ?? []
+  const createItem = useMutation(api.items.createItem)
 
   if (!isOpen) return null
 
@@ -132,35 +139,29 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!formData.name || !formData.categoryId) return
+    if (!formData.name || !formData.categoryId || !userId) return
 
     setIsLoading(true)
     try {
-      let imageUrl = null
+      let imageUrl: string | undefined = undefined
       if (imageFile) {
-        imageUrl = await uploadImage()
+        const uploaded = await uploadImage()
+        if (uploaded) imageUrl = uploaded
       }
 
-      const response = await fetch('/api/items', {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({
-          ...formData,
-          imageUrl,
-        }),
+      await createItem({
+        userId,
+        name: formData.name,
+        description: formData.description || undefined,
+        imageUrl,
+        quantity: formData.quantity,
+        threshold: formData.threshold,
+        notes: formData.notes || undefined,
+        categoryId: formData.categoryId as Id<"categories">,
       })
 
-      if (response.ok) {
-        mutate('/api/items')
-        onClose()
-        resetForm()
-      } else {
-        const data = await response.json()
-        alert(data.error || 'Failed to create item')
-      }
+      onClose()
+      resetForm()
     } catch (error) {
       console.error('Error creating item:', error)
       alert(error instanceof Error ? error.message : 'An error occurred while creating the item')

@@ -2,7 +2,10 @@
 
 import { useState, useMemo } from 'react'
 import { Search, Filter } from 'lucide-react'
-import useSWR from 'swr'
+import { useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
+import { useSession } from 'next-auth/react'
 import InventoryItem from './InventoryItem'
 
 interface Item {
@@ -29,9 +32,11 @@ interface InventoryListProps {
 }
 
 export default function InventoryList({ onEditItem, onDeleteItem }: InventoryListProps) {
-  const { data: items = [], error } = useSWR<Item[]>('/api/items')
-  const { data: categories = [] } = useSWR<Category[]>('/api/categories')
-  
+  const { data: session } = useSession()
+  const userId = session?.user?.id as Id<"users"> | undefined
+  const items = useQuery(api.items.listItems, userId ? { userId } : "skip") ?? []
+  const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
+
   const [searchTerm, setSearchTerm] = useState('')
   const [selectedCategory, setSelectedCategory] = useState<string>('all')
 
@@ -42,29 +47,29 @@ export default function InventoryList({ onEditItem, onDeleteItem }: InventoryLis
         const matchesSearch = item.name.toLowerCase().includes(searchTerm.toLowerCase()) ||
                             (item.notes && item.notes.toLowerCase().includes(searchTerm.toLowerCase()))
         const matchesCategory = selectedCategory === 'all' || item.category.id === selectedCategory
-        
+
         return matchesSearch && matchesCategory
       })
       .sort((a, b) => {
         // Calculate stock level relative to threshold (lower = more urgent)
         const aStockLevel = a.quantity / a.threshold
         const bStockLevel = b.quantity / b.threshold
-        
+
         // Sort by stock level (lowest first)
         if (aStockLevel !== bStockLevel) {
           return aStockLevel - bStockLevel
         }
-        
+
         // If same stock level, sort by absolute quantity (lowest first)
         return a.quantity - b.quantity
       })
   }, [items, searchTerm, selectedCategory])
 
-  if (error) {
+  if (items === undefined) {
     return (
       <div className="card">
         <div className="text-center text-gray-500">
-          Error loading inventory data
+          Loading inventory data...
         </div>
       </div>
     )
@@ -84,7 +89,7 @@ export default function InventoryList({ onEditItem, onDeleteItem }: InventoryLis
             className="w-full pl-10 pr-4 py-2 border border-gray-300 rounded-lg focus:ring-2 focus:ring-primary-500 focus:border-transparent"
           />
         </div>
-        
+
         <div className="relative">
           <Filter className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
           <select
@@ -120,7 +125,7 @@ export default function InventoryList({ onEditItem, onDeleteItem }: InventoryLis
           </div>
           <h3 className="text-lg font-medium text-gray-900 mb-2">No items found</h3>
           <p className="text-gray-500">
-            {searchTerm || selectedCategory !== 'all' 
+            {searchTerm || selectedCategory !== 'all'
               ? 'Try adjusting your search or filter criteria'
               : 'Add some items to get started'
             }
@@ -129,9 +134,9 @@ export default function InventoryList({ onEditItem, onDeleteItem }: InventoryLis
       ) : (
         <div className="grid grid-cols-3 sm:grid-cols-2 md:grid-cols-3 lg:grid-cols-4 gap-3 sm:gap-4 md:gap-6">
           {sortedAndFilteredItems.map(item => (
-            <InventoryItem 
-              key={item.id} 
-              item={item} 
+            <InventoryItem
+              key={item.id}
+              item={item}
               onEdit={onEditItem}
               onDelete={onDeleteItem}
             />

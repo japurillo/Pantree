@@ -25,7 +25,9 @@ import {
   Activity
 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import useSWR from 'swr'
+import { useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
 
 interface Category {
   id: string
@@ -53,8 +55,9 @@ export default function Analytics() {
   const router = useRouter()
   const isAdmin = session?.user?.role === 'ADMIN'
 
-  const { data: items = [] } = useSWR<Item[]>('/api/items')
-  const { data: categories = [] } = useSWR<Category[]>('/api/categories')
+  const userId = session?.user?.id as Id<"users"> | undefined
+  const items = useQuery(api.items.listItems, userId ? { userId } : "skip") ?? []
+  const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
 
   useEffect(() => {
     const timer = setTimeout(() => setIsLoaded(true), 100)

@@ -2,28 +2,6 @@ import { NextRequest, NextResponse } from 'next/server'
 import { getToken } from 'next-auth/jwt'
 import { v2 as cloudinary } from 'cloudinary'
 
-// Supabase configuration
-const supabaseUrl = process.env.SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-// Helper function for Supabase queries
-async function fetchFromSupabase(query: string) {
-  const response = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
-    headers: {
-      'apikey': supabaseServiceKey,
-      'Authorization': `Bearer ${supabaseServiceKey}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
-    }
-  })
-  
-  if (!response.ok) {
-    throw new Error(`Supabase query failed: ${response.statusText}`)
-  }
-  
-  return response.json()
-}
-
 // Configure Cloudinary
 cloudinary.config({
   cloud_name: process.env.CLOUDINARY_CLOUD_NAME,
@@ -41,23 +19,7 @@ export async function POST(request: NextRequest) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
-    const userId = (token.id || token.sub) as string
-    console.log('Upload API: User ID:', userId)
-    
-    // Get user to find their family
-    const userResponse = await fetchFromSupabase(`app_users?id=eq.${userId}&select=familyId`)
-    const users = userResponse as any[]
-    
-    if (!users || users.length === 0) {
-      return NextResponse.json({ error: 'User not found' }, { status: 404 })
-    }
-    
-    const user = users[0]
-    if (!user.familyId) {
-      return NextResponse.json({ error: 'User not assigned to a family' }, { status: 400 })
-    }
-
-    console.log('Upload API: User family ID:', user.familyId)
+    console.log('Upload API: User authenticated')
 
     const formData = await request.formData()
     const file = formData.get('file') as File

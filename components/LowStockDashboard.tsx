@@ -2,7 +2,10 @@
 
 import { useMemo } from 'react'
 import { AlertTriangle, Package } from 'lucide-react'
-import useSWR from 'swr'
+import { useQuery } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
+import { useSession } from 'next-auth/react'
 
 interface Item {
   id: string
@@ -15,17 +18,19 @@ interface Item {
 }
 
 export default function LowStockDashboard() {
-  const { data: items = [], error } = useSWR<Item[]>('/api/items')
+  const { data: session } = useSession()
+  const userId = session?.user?.id as Id<"users"> | undefined
+  const items = useQuery(api.items.listItems, userId ? { userId } : "skip") ?? []
 
   const lowStockItems = useMemo(() => {
     return items.filter(item => item.quantity <= item.threshold)
   }, [items])
 
-  if (error) {
+  if (items === undefined) {
     return (
       <div className="card">
         <div className="text-center text-gray-500">
-          Error loading items
+          Loading items...
         </div>
       </div>
     )

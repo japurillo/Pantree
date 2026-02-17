@@ -2,7 +2,10 @@
 
 import { useState, useEffect } from 'react'
 import { X, Save, Package, ChevronLeft, ChevronRight, Camera, Edit3 } from 'lucide-react'
-import useSWR, { mutate } from 'swr'
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
+import { useSession } from 'next-auth/react'
 import ImageUpload from './ui/ImageUpload'
 
 interface Category {
@@ -30,6 +33,9 @@ interface EditItemModalProps {
 }
 
 export default function EditItemModal({ isOpen, onClose, item }: EditItemModalProps) {
+  const { data: session } = useSession()
+  const userId = session?.user?.id as Id<"users"> | undefined
+
   const [formData, setFormData] = useState({
     quantity: 0,
     threshold: 1
@@ -43,7 +49,8 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null)
   const [imageRemoved, setImageRemoved] = useState(false)
 
-  const { data: categories = [] } = useSWR<Category[]>('/api/categories')
+  const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
+  const updateItemMutation = useMutation(api.items.updateItem)
 
   useEffect(() => {
     if (item) {
@@ -219,7 +226,7 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
 
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault()
-    if (!item) return
+    if (!item || !userId) return
 
     setIsLoading(true)
     setError('')
@@ -252,38 +259,26 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
         }
       }
 
-      const response = await fetch(`/api/items/${item.id}`, {
-        method: 'PATCH',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          quantity: parseInt(formData.quantity.toString()),
-          threshold: parseInt(formData.threshold.toString()),
-          imageUrl: imageUrl
-        }),
+      await updateItemMutation({
+        userId,
+        itemId: item.id as Id<"items">,
+        quantity: parseInt(formData.quantity.toString()),
+        threshold: parseInt(formData.threshold.toString()),
+        imageUrl: imageUrl,
       })
 
-      if (response.ok) {
-        // Update the local image URL to show the new image immediately
-        if (selectedImage && imageUrl) {
-          setCurrentImageUrl(imageUrl)
-        } else if (imageRemoved) {
-          setCurrentImageUrl(null)
-        }
-        
-        // Reset states
-        setImageRemoved(false)
-        setSelectedImage(null)
-        
-        // Refresh the items data
-        mutate('/api/items')
-        onClose()
-      } else {
-        const data = await response.json()
-        setError(data.error || 'Failed to update item')
+      // Update the local image URL to show the new image immediately
+      if (selectedImage && imageUrl) {
+        setCurrentImageUrl(imageUrl)
+      } else if (imageRemoved) {
+        setCurrentImageUrl(null)
       }
+
+      // Reset states
+      setImageRemoved(false)
+      setSelectedImage(null)
+
+      onClose()
     } catch (error) {
       console.error('Error updating item:', error)
       setError(error instanceof Error ? error.message : 'An error occurred while updating the item')
