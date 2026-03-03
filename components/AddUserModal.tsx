@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { X, Copy, RefreshCw, Check, Users } from 'lucide-react'
+import { X, Copy, RefreshCw, Check, Users, Link2 } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { useCurrentUser } from '@/hooks/useCurrentUser'
@@ -14,6 +14,7 @@ interface AddUserModalProps {
 export default function AddUserModal({ isOpen, onClose }: AddUserModalProps) {
   const { userId } = useCurrentUser()
   const [copied, setCopied] = useState(false)
+  const [linkCopied, setLinkCopied] = useState(false)
   const [isRegenerating, setIsRegenerating] = useState(false)
 
   const inviteCode = useQuery(api.auth.getInviteCode, userId ? { userId } : "skip")
@@ -24,6 +25,19 @@ export default function AddUserModal({ isOpen, onClose }: AddUserModalProps) {
     await navigator.clipboard.writeText(inviteCode)
     setCopied(true)
     setTimeout(() => setCopied(false), 2000)
+  }
+
+  const inviteLink = inviteCode
+    ? typeof window !== 'undefined'
+      ? `${window.location.origin}/join/${inviteCode}`
+      : `/join/${inviteCode}`
+    : null
+
+  const handleCopyLink = async () => {
+    if (!inviteLink) return
+    await navigator.clipboard.writeText(inviteLink)
+    setLinkCopied(true)
+    setTimeout(() => setLinkCopied(false), 2000)
   }
 
   const handleRegenerate = async () => {
@@ -96,14 +110,39 @@ export default function AddUserModal({ isOpen, onClose }: AddUserModalProps) {
                 </div>
               </div>
 
+              {/* Shareable Invite Link */}
+              <div className="bg-gray-50 rounded-lg p-4">
+                <label className="block text-sm font-medium text-gray-700 mb-2">
+                  <Link2 className="h-4 w-4 inline mr-1 -mt-0.5" />
+                  Shareable Invite Link
+                </label>
+                <div className="flex items-center space-x-2">
+                  <div className="flex-1 bg-white border border-gray-300 rounded-md px-3 py-2 overflow-hidden">
+                    <span className="text-sm text-gray-700 truncate block">
+                      {inviteLink ?? '...'}
+                    </span>
+                  </div>
+                  <button
+                    onClick={handleCopyLink}
+                    className="p-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-md transition-colors"
+                    title="Copy invite link"
+                  >
+                    {linkCopied ? (
+                      <Check className="h-5 w-5 text-green-600" />
+                    ) : (
+                      <Copy className="h-5 w-5" />
+                    )}
+                  </button>
+                </div>
+              </div>
+
               {/* Instructions */}
               <div className="bg-blue-50 rounded-lg p-4">
                 <h4 className="text-sm font-medium text-blue-900 mb-2">How it works:</h4>
                 <ol className="text-sm text-blue-700 space-y-1 list-decimal list-inside">
-                  <li>Share the invite code with your family member</li>
-                  <li>They sign up for an account on the app</li>
-                  <li>They enter the invite code to join your family</li>
-                  <li>They get access to your shared pantry</li>
+                  <li>Copy the invite link above and send it to your family member</li>
+                  <li>They open the link and sign in or create an account</li>
+                  <li>They click &ldquo;Join Family&rdquo; to join your shared pantry</li>
                 </ol>
               </div>
 
