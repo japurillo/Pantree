@@ -8,11 +8,6 @@ import { Id } from '@/convex/_generated/dataModel'
 import { useSession } from 'next-auth/react'
 import ImageUpload from './ui/ImageUpload'
 
-interface Category {
-  id: string
-  name: string
-}
-
 interface Item {
   id: string
   name: string
@@ -49,7 +44,7 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
   const [currentImageUrl, setCurrentImageUrl] = useState<string | null>(null)
   const [imageRemoved, setImageRemoved] = useState(false)
 
-  const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
+  useQuery(api.categories.listCategories, userId ? { userId } : "skip")
   const updateItemMutation = useMutation(api.items.updateItem)
 
   useEffect(() => {
@@ -194,7 +189,7 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
           return await uploadImageDirect(file)
         } catch (directError) {
           console.error('EditItemModal: Direct upload also failed:', directError)
-          throw new Error('Both upload methods failed. Please try again with a smaller image.')
+          throw new Error('Both upload methods failed. Please try again with a smaller image.', { cause: directError })
         }
       }
       
@@ -319,8 +314,9 @@ export default function EditItemModal({ isOpen, onClose, item }: EditItemModalPr
               <div className="flex items-center space-x-3">
                 <div className="relative group">
                   {currentImageUrl ? (
-                    <img 
-                      src={currentImageUrl} 
+                    /* eslint-disable-next-line @next/next/no-img-element */
+                    <img
+                      src={currentImageUrl}
                       alt={item.name}
                       className="w-12 h-12 object-cover rounded-lg"
                     />

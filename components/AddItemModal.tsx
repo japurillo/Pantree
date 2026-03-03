@@ -1,18 +1,13 @@
 'use client'
 
-import { useState, useEffect, useRef } from 'react'
-import { X, Plus, Search, Package } from 'lucide-react'
+import { useState, useRef } from 'react'
+import { X, Plus, Package } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 import { useSession } from 'next-auth/react'
 import ImageUpload from './ui/ImageUpload'
 import NumberStepper from './ui/NumberStepper'
-
-interface Category {
-  id: string
-  name: string
-}
 
 interface Item {
   id: string
@@ -246,6 +241,7 @@ export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
                         <div className="flex items-center space-x-3">
                           <div className="flex-shrink-0">
                             {item.imageUrl ? (
+                              /* eslint-disable-next-line @next/next/no-img-element */
                               <img
                                 src={item.imageUrl}
                                 alt={item.name}

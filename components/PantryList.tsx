@@ -8,24 +8,6 @@ import { Id } from '@/convex/_generated/dataModel'
 import { useSession } from 'next-auth/react'
 import PantryItem from './PantryItem'
 
-interface Item {
-  id: string
-  name: string
-  quantity: number
-  threshold: number
-  imageUrl?: string
-  notes?: string
-  category: {
-    id: string
-    name: string
-  }
-}
-
-interface Category {
-  id: string
-  name: string
-}
-
 export default function PantryList() {
   const { data: session } = useSession()
   const userId = session?.user?.id as Id<"users"> | undefined

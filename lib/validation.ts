@@ -74,6 +74,7 @@ export function validateInput<T>(schema: z.ZodSchema<T>, data: unknown): { succe
 }
 
 // Rate limiting validation
+// eslint-disable-next-line @typescript-eslint/no-unused-vars
 export function validateRateLimit(identifier: string, maxRequests: number, windowMs: number): boolean {
   // This is a basic implementation - in production, use Redis or similar
   return true // Placeholder - implement with your rate limiting solution

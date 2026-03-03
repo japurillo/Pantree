@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from 'react'
 import { useSession, signOut } from 'next-auth/react'
-import { UserPlus, Users, LogOut, Menu, X, ArrowLeft, Package, BarChart3, Settings } from 'lucide-react'
+import { Users, LogOut, Menu, X, ArrowLeft, Package, BarChart3, Settings } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import UserManagement from './UserManagement'
 

@@ -7,16 +7,6 @@ import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 import { useSession } from 'next-auth/react'
 
-interface Item {
-  id: string
-  name: string
-  quantity: number
-  threshold: number
-  category: {
-    name: string
-  }
-}
-
 export default function LowStockDashboard() {
   const { data: session } = useSession()
   const userId = session?.user?.id as Id<"users"> | undefined

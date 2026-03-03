@@ -1,7 +1,7 @@
 'use client'
 
 import { useState } from 'react'
-import { Plus, UserPlus, Trash2, Shield, User, Edit, Eye, EyeOff, X } from 'lucide-react'
+import { UserPlus, Trash2, Shield, User, Edit, X } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
@@ -16,9 +16,7 @@ interface UserData {
   createdAt: string
 }
 
-interface UserManagementProps {}
-
-export default function UserManagement({}: UserManagementProps) {
+export default function UserManagement() {
   const { data: session } = useSession()
   const userId = session?.user?.id as Id<"users"> | undefined
 

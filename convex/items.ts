@@ -111,7 +111,7 @@ export const updateItem = mutation({
       throw new Error("Item not found");
     }
 
-    const updates: Record<string, any> = {};
+    const updates: Record<string, string | number | undefined> = {};
     if (args.quantity !== undefined) updates.quantity = args.quantity;
     if (args.threshold !== undefined) updates.threshold = args.threshold;
     if (args.notes !== undefined) updates.notes = args.notes;

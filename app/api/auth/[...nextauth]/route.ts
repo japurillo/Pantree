@@ -1,4 +1,4 @@
-import NextAuth from 'next-auth'
+import NextAuth, { Session } from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
 import { ConvexHttpClient } from 'convex/browser'
@@ -49,15 +49,15 @@ const handler = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
-        token.username = (user as any).username
-        token.role = (user as any).role
+        token.username = (user as { username: string }).username
+        token.role = (user as { role: string }).role
       }
       return token
     },
     async session({ session, token }) {
       if (token) {
         if (!session.user) {
-          session.user = {} as any
+          session.user = {} as Session['user']
         }
         session.user.id = token.id as string
         session.user.username = token.username as string

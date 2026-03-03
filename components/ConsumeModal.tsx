@@ -53,7 +53,7 @@ export default function ConsumeModal({ isOpen, item, onClose }: ConsumeModalProp
       await consumeItem({ userId: userId!, itemId: item.id as Id<"items">, amount })
       onClose()
       setAmount(1)
-    } catch (error) {
+    } catch {
       alert('An error occurred while consuming the item')
     } finally {
       setIsLoading(false)
