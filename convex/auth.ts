@@ -73,6 +73,28 @@ export const createUserFromClerk = mutation({
   },
 });
 
+// Look up a family by invite code (public, returns safe info only)
+export const getFamilyByInviteCode = query({
+  args: { inviteCode: v.string() },
+  handler: async (ctx, { inviteCode }) => {
+    const family = await ctx.db
+      .query("families")
+      .withIndex("by_inviteCode", (q) => q.eq("inviteCode", inviteCode))
+      .first();
+    if (!family) return null;
+
+    const members = await ctx.db
+      .query("users")
+      .withIndex("by_familyId", (q) => q.eq("familyId", family._id))
+      .collect();
+
+    return {
+      name: family.name,
+      memberCount: members.length,
+    };
+  },
+});
+
 // Join a family via invite code
 export const joinFamily = mutation({
   args: {
@@ -85,16 +107,56 @@ export const joinFamily = mutation({
       .withIndex("by_clerkId", (q) => q.eq("clerkId", clerkId))
       .first();
     if (!user) throw new Error("User not found");
-    if (user.familyId) throw new Error("User already belongs to a family");
 
-    const family = await ctx.db
+    const targetFamily = await ctx.db
       .query("families")
       .withIndex("by_inviteCode", (q) => q.eq("inviteCode", inviteCode))
       .first();
-    if (!family) throw new Error("Invalid invite code");
+    if (!targetFamily) throw new Error("Invalid invite code");
 
-    await ctx.db.patch(user._id, { familyId: family._id, role: "USER" });
-    return family._id;
+    // Already in the target family — no-op
+    if (user.familyId && user.familyId === targetFamily._id) {
+      return targetFamily._id;
+    }
+
+    // User is in a different family
+    if (user.familyId) {
+      const currentMembers = await ctx.db
+        .query("users")
+        .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId!))
+        .collect();
+
+      if (currentMembers.length > 1) {
+        throw new Error("You must leave your current family before joining another");
+      }
+
+      // Sole member of auto-created family — clean it up
+      const oldFamilyId = user.familyId;
+
+      // Delete all items belonging to the old family
+      const items = await ctx.db
+        .query("items")
+        .withIndex("by_familyId", (q) => q.eq("familyId", oldFamilyId))
+        .collect();
+      for (const item of items) {
+        await ctx.db.delete(item._id);
+      }
+
+      // Delete all categories belonging to the old family
+      const categories = await ctx.db
+        .query("categories")
+        .withIndex("by_familyId", (q) => q.eq("familyId", oldFamilyId))
+        .collect();
+      for (const cat of categories) {
+        await ctx.db.delete(cat._id);
+      }
+
+      // Delete the old family record
+      await ctx.db.delete(oldFamilyId);
+    }
+
+    await ctx.db.patch(user._id, { familyId: targetFamily._id, role: "USER" });
+    return targetFamily._id;
   },
 });
 
