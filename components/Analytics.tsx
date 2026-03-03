@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useClerk } from '@clerk/nextjs'
 import { motion } from 'framer-motion'
 import { 
   Package, 
@@ -25,20 +26,19 @@ import {
 import { useRouter } from 'next/navigation'
 import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
-import { Id } from '@/convex/_generated/dataModel'
 
 export default function Analytics() {
-  const { data: session } = useSession()
+  const { userId, username, role } = useCurrentUser()
+  const { signOut } = useClerk()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
-  const isAdmin = session?.user?.role === 'ADMIN'
+  const isAdmin = role === 'ADMIN'
 
-  const userId = session?.user?.id as Id<"users"> | undefined
   const items = useQuery(api.items.listItems, userId ? { userId } : "skip") ?? []
   const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: '/auth/signin' })
+    signOut({ redirectUrl: '/sign-in' })
   }
 
   // Mock analytics data for demonstration
@@ -79,7 +79,7 @@ export default function Analytics() {
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-700">
-                Welcome, {session?.user?.username}
+                Welcome, {username}
               </span>
               <button
                 onClick={handleSignOut}

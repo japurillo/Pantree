@@ -13,7 +13,6 @@ export const listUsers = query({
       .withIndex("by_familyId", (q) => q.eq("familyId", user.familyId))
       .collect();
 
-    // Strip passwords and add id alias
     return users
       // eslint-disable-next-line @typescript-eslint/no-unused-vars
       .map(({ password, ...rest }) => ({
@@ -22,48 +21,6 @@ export const listUsers = query({
         createdAt: new Date(rest._creationTime).toISOString(),
       }))
       .sort((a, b) => a.username.localeCompare(b.username));
-  },
-});
-
-export const createUser = mutation({
-  args: {
-    adminUserId: v.id("users"),
-    username: v.string(),
-    email: v.string(),
-    hashedPassword: v.string(),
-    role: v.union(v.literal("USER"), v.literal("ADMIN")),
-  },
-  handler: async (ctx, args) => {
-    const admin = await getUserWithFamily(ctx, args.adminUserId);
-    if (admin.role !== "ADMIN") throw new Error("Admin access required");
-
-    // Check username uniqueness
-    const existingUsername = await ctx.db
-      .query("users")
-      .withIndex("by_username", (q) => q.eq("username", args.username.trim()))
-      .first();
-    if (existingUsername) throw new Error("Username already exists");
-
-    // Check email uniqueness
-    const existingEmail = await ctx.db
-      .query("users")
-      .withIndex("by_email", (q) => q.eq("email", args.email.trim()))
-      .first();
-    if (existingEmail) throw new Error("Email already exists");
-
-    const newUserId = await ctx.db.insert("users", {
-      username: args.username.trim(),
-      email: args.email.trim(),
-      password: args.hashedPassword,
-      role: args.role,
-      familyId: admin.familyId,
-    });
-
-    const newUser = await ctx.db.get(newUserId);
-    if (!newUser) throw new Error("Failed to create user");
-    // eslint-disable-next-line @typescript-eslint/no-unused-vars
-    const { password, ...userWithoutPassword } = newUser;
-    return { ...userWithoutPassword, id: newUserId };
   },
 });
 

@@ -1,6 +1,6 @@
 'use client'
 
-import { useSession } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { Package, Users, BarChart3, Settings, FolderOpen } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 
@@ -10,9 +10,9 @@ interface SharedSidebarProps {
 }
 
 export default function SharedSidebar({ currentPage, onClose }: SharedSidebarProps) {
-  const { data: session } = useSession()
+  const { role } = useCurrentUser()
   const router = useRouter()
-  const isAdmin = session?.user?.role === 'ADMIN'
+  const isAdmin = role === 'ADMIN'
 
   const handleNavigation = (path: string) => {
     router.push(path)

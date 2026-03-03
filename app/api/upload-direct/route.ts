@@ -1,5 +1,5 @@
 import { NextRequest, NextResponse } from 'next/server'
-import { getToken } from 'next-auth/jwt'
+import { auth } from '@clerk/nextjs/server'
 import { v2 as cloudinary } from 'cloudinary'
 
 // Configure Cloudinary
@@ -13,9 +13,9 @@ export async function POST(request: NextRequest) {
   try {
     console.log('Direct Upload API: Starting upload process')
     
-    const token = await getToken({ req: request })
-    
-    if (!token?.id && !token?.sub) {
+    const { userId } = await auth()
+
+    if (!userId) {
       return NextResponse.json({ error: 'Unauthorized' }, { status: 401 })
     }
 
@@ -40,7 +40,7 @@ export async function POST(request: NextRequest) {
 
     // Use direct upload method with shorter timeout
     const folder = process.env.CLOUDINARY_FOLDER || 'pantree'
-    const username = token.username || 'unknown'
+    const username = userId
     
     console.log('Direct Upload API: Starting Cloudinary direct upload')
     
