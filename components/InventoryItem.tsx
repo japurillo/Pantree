@@ -31,9 +31,12 @@ export default function InventoryItem({ item, onEdit, onDelete }: InventoryItemP
   }
 
   return (
-    <button
+    <div
       onClick={handleCardClick}
-      className="group relative bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:shadow-md transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer"
+      onKeyDown={(e) => { if (e.key === 'Enter' || e.key === ' ') { e.preventDefault(); handleCardClick() } }}
+      role="button"
+      tabIndex={0}
+      className="group relative bg-white rounded-lg shadow-sm border border-gray-200 p-3 sm:p-4 hover:shadow-md transition-all duration-200 hover:scale-105 focus:outline-none focus:ring-2 focus:ring-primary-500 cursor-pointer text-left"
     >
       {/* Image */}
       <div className="relative w-full h-24 sm:h-28 md:h-32 mb-2 sm:mb-3 rounded-lg overflow-hidden bg-gray-100">
@@ -121,6 +124,6 @@ export default function InventoryItem({ item, onEdit, onDelete }: InventoryItemP
 
 
       </div>
-    </button>
+    </div>
   )
 }
