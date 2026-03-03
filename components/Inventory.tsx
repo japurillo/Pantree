@@ -4,7 +4,9 @@ import { useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { Plus, Package, Users, LogOut, Menu, X, ArrowLeft, BarChart3, Settings, FolderOpen, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
-import { mutate } from 'swr'
+import { useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
 
 import InventoryList from './InventoryList'
 import EditItemModal from './EditItemModal'
@@ -25,6 +27,8 @@ interface Item {
 
 export default function Inventory() {
   const { data: session } = useSession()
+  const userId = session?.user?.id as Id<"users"> | undefined
+  const deleteItemMutation = useMutation(api.items.deleteItem)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
@@ -54,25 +58,15 @@ export default function Inventory() {
   }
 
   const confirmDelete = async () => {
-    if (!selectedItem) return
+    if (!selectedItem || !userId) return
 
     try {
-      const response = await fetch(`/api/items/${selectedItem.id}`, {
-        method: 'DELETE',
-        credentials: 'include'
+      await deleteItemMutation({
+        userId,
+        itemId: selectedItem.id as Id<"items">,
       })
-
-      if (response.ok) {
-        // Optimistically update the UI by removing the item from the cache
-        mutate('/api/items', (currentItems: Item[] = []) => 
-          currentItems.filter(i => i.id !== selectedItem.id)
-        )
-        setShowDeleteModal(false)
-        setSelectedItem(null)
-      } else {
-        const error = await response.json()
-        alert(`Failed to delete item: ${error.error || 'Unknown error'}`)
-      }
+      setShowDeleteModal(false)
+      setSelectedItem(null)
     } catch (error) {
       console.error('Error deleting item:', error)
       alert('Failed to delete item. Please try again.')

@@ -2,7 +2,10 @@
 
 import { useState } from 'react'
 import { X, Minus, ChevronLeft, ChevronRight } from 'lucide-react'
-import useSWR, { mutate } from 'swr'
+import { useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
+import { useSession } from 'next-auth/react'
 
 interface Item {
   id: string
@@ -23,6 +26,10 @@ interface ConsumeModalProps {
 export default function ConsumeModal({ isOpen, item, onClose }: ConsumeModalProps) {
   const [amount, setAmount] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
+  const { data: session } = useSession()
+  const userId = session?.user?.id as Id<"users"> | undefined
+
+  const consumeItem = useMutation(api.items.consumeItem)
 
   if (!isOpen || !item) return null
 
@@ -43,24 +50,9 @@ export default function ConsumeModal({ isOpen, item, onClose }: ConsumeModalProp
 
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/items/${item.id}/consume`, {
-        method: 'POST',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ amount }),
-      })
-
-      if (response.ok) {
-        // Refresh the items list
-        mutate('/api/items')
-        onClose()
-        setAmount(1)
-      } else {
-        const data = await response.json()
-        alert(data.error || 'Failed to consume item')
-      }
+      await consumeItem({ userId: userId!, itemId: item.id as Id<"items">, amount })
+      onClose()
+      setAmount(1)
     } catch (error) {
       alert('An error occurred while consuming the item')
     } finally {
@@ -113,7 +105,7 @@ export default function ConsumeModal({ isOpen, item, onClose }: ConsumeModalProp
                 <label className="block text-sm font-medium text-gray-700 mb-3">
                   Amount to consume:
                 </label>
-                
+
                 {/* Number Stepper */}
                 <div className="flex items-center justify-center space-x-4">
                   <button
@@ -128,7 +120,7 @@ export default function ConsumeModal({ isOpen, item, onClose }: ConsumeModalProp
                   >
                     <ChevronLeft className="h-6 w-6" />
                   </button>
-                  
+
                   <div className="text-center">
                     <div className="text-3xl font-bold text-primary-600 min-w-[3rem]">
                       {amount}
@@ -137,7 +129,7 @@ export default function ConsumeModal({ isOpen, item, onClose }: ConsumeModalProp
                       of {item.quantity} available
                     </div>
                   </div>
-                  
+
                   <button
                     type="button"
                     onClick={handleIncrease}

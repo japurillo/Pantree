@@ -1,7 +1,10 @@
 'use client'
 
 import { useState } from 'react'
-import useSWR from 'swr'
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
+import { useSession } from 'next-auth/react'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 
 interface Category {
@@ -9,7 +12,6 @@ interface Category {
   name: string
   description?: string
   createdAt: string
-  updatedAt: string
 }
 
 interface AddCategoryModalProps {
@@ -17,15 +19,19 @@ interface AddCategoryModalProps {
   onClose: () => void
   onSuccess: () => void
   editingCategory?: Category | null
+  userId: Id<"users"> | undefined
 }
 
-function AddCategoryModal({ isOpen, onClose, onSuccess, editingCategory }: AddCategoryModalProps) {
+function AddCategoryModal({ isOpen, onClose, onSuccess, editingCategory, userId }: AddCategoryModalProps) {
   const [formData, setFormData] = useState({
     name: editingCategory?.name || '',
     description: editingCategory?.description || ''
   })
   const [isLoading, setIsLoading] = useState(false)
   const [error, setError] = useState('')
+
+  const createCat = useMutation(api.categories.createCategory)
+  const updateCat = useMutation(api.categories.updateCategory)
 
   const isEditing = !!editingCategory
 
@@ -37,18 +43,19 @@ function AddCategoryModal({ isOpen, onClose, onSuccess, editingCategory }: AddCa
     setError('')
 
     try {
-      const url = isEditing ? `/api/categories/${editingCategory.id}` : '/api/categories'
-      const method = isEditing ? 'PATCH' : 'POST'
-      
-      const response = await fetch(url, {
-        method,
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(formData)
-      })
-
-      if (!response.ok) {
-        const errorData = await response.json()
-        throw new Error(errorData.error || 'Failed to save category')
+      if (isEditing) {
+        await updateCat({
+          userId: userId!,
+          categoryId: editingCategory.id as Id<"categories">,
+          name: formData.name.trim(),
+          description: formData.description?.trim(),
+        })
+      } else {
+        await createCat({
+          userId: userId!,
+          name: formData.name.trim(),
+          description: formData.description?.trim(),
+        })
       }
 
       onSuccess()
@@ -75,7 +82,7 @@ function AddCategoryModal({ isOpen, onClose, onSuccess, editingCategory }: AddCa
         <h2 className="text-lg sm:text-xl font-semibold mb-3 sm:mb-4">
           {isEditing ? 'Edit Category' : 'Add New Category'}
         </h2>
-        
+
         <form onSubmit={handleSubmit} className="space-y-3 sm:space-y-4">
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-700 mb-1">
@@ -91,7 +98,7 @@ function AddCategoryModal({ isOpen, onClose, onSuccess, editingCategory }: AddCa
               required
             />
           </div>
-          
+
           <div>
             <label htmlFor="description" className="block text-sm font-medium text-gray-700 mb-1">
               Description (Optional)
@@ -135,7 +142,12 @@ function AddCategoryModal({ isOpen, onClose, onSuccess, editingCategory }: AddCa
 }
 
 export default function CategoryManagement() {
-  const { data: categories = [], error, mutate } = useSWR<Category[]>('/api/categories')
+  const { data: session } = useSession()
+  const userId = session?.user?.id as Id<"users"> | undefined
+
+  const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
+  const deleteCat = useMutation(api.categories.deleteCategory)
+
   const [isAddModalOpen, setIsAddModalOpen] = useState(false)
   const [editingCategory, setEditingCategory] = useState<Category | null>(null)
   const [isLoading, setIsLoading] = useState(false)
@@ -152,15 +164,10 @@ export default function CategoryManagement() {
 
     setIsLoading(true)
     try {
-      const response = await fetch(`/api/categories/${categoryId}`, {
-        method: 'DELETE'
+      await deleteCat({
+        userId: userId!,
+        categoryId: categoryId as Id<"categories">,
       })
-
-      if (!response.ok) {
-        throw new Error('Failed to delete category')
-      }
-
-      mutate()
     } catch (error) {
       console.error('Error deleting category:', error)
       alert('Failed to delete category')
@@ -170,19 +177,13 @@ export default function CategoryManagement() {
   }
 
   const handleSuccess = () => {
-    mutate()
+    // Convex auto-refreshes queries
   }
 
-  if (error) {
+  if (categories === undefined) {
     return (
       <div className="text-center py-8">
-        <p className="text-red-600">Failed to load categories</p>
-        <button 
-          onClick={() => mutate()} 
-          className="mt-2 text-blue-600 hover:underline"
-        >
-          Try again
-        </button>
+        <p className="text-gray-600">Loading categories...</p>
       </div>
     )
   }
@@ -259,11 +260,11 @@ export default function CategoryManagement() {
                   </button>
                 </div>
               </div>
-              
+
               {category.description && (
                 <p className="text-xs sm:text-sm text-gray-600 mb-2 sm:mb-3 md:mb-4 overflow-hidden text-ellipsis whitespace-nowrap">{category.description}</p>
               )}
-              
+
               <div className="text-xs text-gray-400">
                 Created {new Date(category.createdAt).toLocaleDateString()}
               </div>
@@ -281,6 +282,7 @@ export default function CategoryManagement() {
         }}
         onSuccess={handleSuccess}
         editingCategory={editingCategory}
+        userId={userId}
       />
     </div>
   )

@@ -2,10 +2,13 @@
 
 import { useState } from 'react'
 import { Plus, UserPlus, Trash2, Shield, User, Edit, Eye, EyeOff, X } from 'lucide-react'
-import useSWR, { mutate } from 'swr'
+import { useQuery, useMutation } from 'convex/react'
+import { api } from '@/convex/_generated/api'
+import { Id } from '@/convex/_generated/dataModel'
+import { useSession } from 'next-auth/react'
 import AddUserModal from './AddUserModal'
 
-interface User {
+interface UserData {
   id: string
   username: string
   email: string
@@ -16,77 +19,43 @@ interface User {
 interface UserManagementProps {}
 
 export default function UserManagement({}: UserManagementProps) {
+  const { data: session } = useSession()
+  const userId = session?.user?.id as Id<"users"> | undefined
+
   const [showAddUserModal, setShowAddUserModal] = useState(false)
-  const [selectedUser, setSelectedUser] = useState<User | null>(null)
+  const [selectedUser, setSelectedUser] = useState<UserData | null>(null)
   const [showDeleteModal, setShowDeleteModal] = useState(false)
-  const [editingUser, setEditingUser] = useState<User | null>(null)
+  const [editingUser, setEditingUser] = useState<UserData | null>(null)
   const [editForm, setEditForm] = useState({
     username: '',
     email: '',
     role: ''
   })
 
-  const { data: users, error } = useSWR<User[]>('/api/users')
+  const users = useQuery(api.users.listUsers, userId ? { userId } : "skip")
+  const deleteUserMutation = useMutation(api.users.deleteUser)
+  const updateUserMutation = useMutation(api.users.updateUser)
 
-  // Debug logging
-  console.log('UserManagement - Raw users data:', users)
-  console.log('UserManagement - Error:', error)
-  console.log('UserManagement - Users type:', typeof users)
-  console.log('UserManagement - Is array:', Array.isArray(users))
-
-  // Ensure users is always an array and handle loading/error states
   const safeUsers = Array.isArray(users) ? users : []
-  const isLoading = !users && !error
-  
-  // Check if users contains an error message (API error response)
-  const hasApiError = users && typeof users === 'object' && 'error' in users
-  const apiErrorMessage = hasApiError ? (users as any).error : null
+  const isLoading = users === undefined
+  const error = null
 
   const handleDeleteUser = async () => {
-    if (!selectedUser) return
+    if (!selectedUser || !userId) return
 
     try {
-      const response = await fetch(`/api/users/${selectedUser.id}`, {
-        method: 'DELETE',
-        credentials: 'include',
+      await deleteUserMutation({
+        adminUserId: userId,
+        targetUserId: selectedUser.id as Id<"users">,
       })
-
-      if (response.ok) {
-        mutate('/api/users')
-        setShowDeleteModal(false)
-        setSelectedUser(null)
-      } else {
-        const data = await response.json()
-        alert(data.error || 'Failed to delete user')
-      }
+      setShowDeleteModal(false)
+      setSelectedUser(null)
     } catch (error) {
-      alert('An error occurred while deleting the user')
+      alert(error instanceof Error ? error.message : 'An error occurred while deleting the user')
     }
   }
 
-  const handleRoleChange = async (userId: string, newRole: string) => {
-    try {
-      const response = await fetch(`/api/users/${userId}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify({ role: newRole }),
-      })
-
-      if (response.ok) {
-        mutate('/api/users')
-      } else {
-        const data = await response.json()
-        alert(data.error || 'Failed to update user role')
-      }
-    } catch (error) {
-      alert('An error occurred while updating the user role')
-    }
-  }
-
-  const handleEditUser = (user: User) => {
+  const handleEditUser = (user: UserData) => {
     setEditingUser(user)
     setEditForm({
       username: user.username,
@@ -96,28 +65,20 @@ export default function UserManagement({}: UserManagementProps) {
   }
 
   const handleSaveEdit = async () => {
-    if (!editingUser) return
+    if (!editingUser || !userId) return
 
     try {
-      const response = await fetch(`/api/users/${editingUser.id}`, {
-        method: 'PATCH',
-        credentials: 'include',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        body: JSON.stringify(editForm),
+      await updateUserMutation({
+        adminUserId: userId,
+        targetUserId: editingUser.id as Id<"users">,
+        username: editForm.username,
+        email: editForm.email,
+        role: editForm.role as "USER" | "ADMIN",
       })
-
-      if (response.ok) {
-        mutate('/api/users')
-        setEditingUser(null)
-        setEditForm({ username: '', email: '', role: '' })
-      } else {
-        const data = await response.json()
-        alert(data.error || 'Failed to update user')
-      }
+      setEditingUser(null)
+      setEditForm({ username: '', email: '', role: '' })
     } catch (error) {
-      alert('An error occurred while updating the user')
+      alert(error instanceof Error ? error.message : 'An error occurred while updating the user')
     }
   }
 
@@ -126,8 +87,8 @@ export default function UserManagement({}: UserManagementProps) {
     setEditForm({ username: '', email: '', role: '' })
   }
 
-  if (error || hasApiError) {
-    const errorMessage = apiErrorMessage || 'Error loading users'
+  if (error) {
+    const errorMessage = 'Error loading users'
     
     return (
       <div className="space-y-6">

@@ -2,7 +2,7 @@ import type { Metadata } from 'next'
 import { Inter } from 'next/font/google'
 import './globals.css'
 import { AuthProvider } from '@/components/providers/AuthProvider'
-import { SWRProvider } from '@/components/providers/SWRProvider'
+import { ConvexProvider } from '@/components/providers/ConvexProvider'
 
 const inter = Inter({ subsets: ['latin'] })
 
@@ -19,11 +19,11 @@ export default function RootLayout({
   return (
     <html lang="en">
       <body className={inter.className}>
-        <AuthProvider>
-          <SWRProvider>
+        <ConvexProvider>
+          <AuthProvider>
             {children}
-          </SWRProvider>
-        </AuthProvider>
+          </AuthProvider>
+        </ConvexProvider>
       </body>
     </html>
   )

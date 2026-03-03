@@ -2,7 +2,6 @@
 
 import { useState } from 'react'
 import { X, UserPlus, Eye, EyeOff } from 'lucide-react'
-import useSWR, { mutate } from 'swr'
 
 interface AddUserModalProps {
   isOpen: boolean
@@ -47,8 +46,6 @@ export default function AddUserModal({ isOpen, onClose }: AddUserModalProps) {
       })
 
       if (response.ok) {
-        // Refresh the users list
-        mutate('/api/users')
         onClose()
         // Reset form
         setFormData({

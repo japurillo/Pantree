@@ -1,28 +1,10 @@
 import NextAuth from 'next-auth'
 import CredentialsProvider from 'next-auth/providers/credentials'
 import bcrypt from 'bcryptjs'
+import { ConvexHttpClient } from 'convex/browser'
+import { api } from '@/convex/_generated/api'
 
-// Supabase configuration
-const supabaseUrl = process.env.SUPABASE_URL!
-const supabaseServiceKey = process.env.SUPABASE_SERVICE_ROLE_KEY!
-
-// Helper function for Supabase queries
-async function fetchFromSupabase(query: string) {
-  const response = await fetch(`${supabaseUrl}/rest/v1/${query}`, {
-    headers: {
-      'apikey': supabaseServiceKey,
-      'Authorization': `Bearer ${supabaseServiceKey}`,
-      'Content-Type': 'application/json',
-      'Prefer': 'return=representation'
-    }
-  })
-  
-  if (!response.ok) {
-    throw new Error(`Supabase query failed: ${response.statusText}`)
-  }
-  
-  return response.json()
-}
+const convex = new ConvexHttpClient(process.env.NEXT_PUBLIC_CONVEX_URL!)
 
 const handler = NextAuth({
   providers: [
@@ -38,28 +20,23 @@ const handler = NextAuth({
         }
 
         try {
-          // Find user by username from app_users table
-          const usersResponse = await fetchFromSupabase(`app_users?username=eq.${credentials.username}&select=*`)
-          const users = usersResponse as any[]
-          
-          if (!users || users.length === 0) {
-            return null
-          }
+          const user = await convex.query(api.auth.getUserByUsername, {
+            username: credentials.username,
+          })
 
-          const user = users[0]
-          
-          // Verify password
-          const isPasswordValid = await bcrypt.compare(credentials.password, user.password)
-          
-          if (!isPasswordValid) {
-            return null
-          }
+          if (!user) return null
+
+          const isPasswordValid = await bcrypt.compare(
+            credentials.password,
+            user.password
+          )
+          if (!isPasswordValid) return null
 
           return {
-            id: user.id,
+            id: user._id,
             username: user.username,
             email: user.email,
-            role: user.role
+            role: user.role,
           }
         } catch (error) {
           console.error('Auth error:', error)
@@ -72,14 +49,13 @@ const handler = NextAuth({
     async jwt({ token, user }) {
       if (user) {
         token.id = user.id
-        token.username = user.username
-        token.role = user.role
+        token.username = (user as any).username
+        token.role = (user as any).role
       }
       return token
     },
     async session({ session, token }) {
       if (token) {
-        // Ensure we have a user object
         if (!session.user) {
           session.user = {} as any
         }
