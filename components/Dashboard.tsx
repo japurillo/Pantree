@@ -1,21 +1,23 @@
 'use client'
 
 import { useState } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useClerk } from '@clerk/nextjs'
 import { Package, Users, LogOut, Menu, X, BarChart3, Settings, FolderOpen } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import LowStockOverview from './LowStockOverview'
 import PantryList from './PantryList'
 
 export default function Dashboard() {
-  const { data: session } = useSession()
+  const { username, role } = useCurrentUser()
+  const { signOut } = useClerk()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
 
-  const isAdmin = session?.user?.role === 'ADMIN'
+  const isAdmin = role === 'ADMIN'
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: '/auth/signin' })
+    signOut({ redirectUrl: '/sign-in' })
   }
 
   return (
@@ -38,7 +40,7 @@ export default function Dashboard() {
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-700">
-                Welcome, {session?.user?.username}
+                Welcome, {username}
               </span>
               <button
                 onClick={handleSignOut}

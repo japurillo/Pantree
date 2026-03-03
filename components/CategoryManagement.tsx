@@ -4,7 +4,7 @@ import { useState } from 'react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
-import { useSession } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import { PlusIcon, PencilIcon, TrashIcon } from '@heroicons/react/24/outline'
 
 interface Category {
@@ -142,8 +142,7 @@ function AddCategoryModal({ isOpen, onClose, onSuccess, editingCategory, userId 
 }
 
 export default function CategoryManagement() {
-  const { data: session } = useSession()
-  const userId = session?.user?.id as Id<"users"> | undefined
+  const { userId } = useCurrentUser()
 
   const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
   const deleteCat = useMutation(api.categories.deleteCategory)

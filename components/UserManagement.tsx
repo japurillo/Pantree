@@ -5,7 +5,7 @@ import { UserPlus, Trash2, Shield, User, Edit, X } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
-import { useSession } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import AddUserModal from './AddUserModal'
 
 interface UserData {
@@ -17,8 +17,7 @@ interface UserData {
 }
 
 export default function UserManagement() {
-  const { data: session } = useSession()
-  const userId = session?.user?.id as Id<"users"> | undefined
+  const { userId } = useCurrentUser()
 
   const [showAddUserModal, setShowAddUserModal] = useState(false)
   const [selectedUser, setSelectedUser] = useState<UserData | null>(null)

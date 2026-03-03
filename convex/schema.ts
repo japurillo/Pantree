@@ -5,16 +5,19 @@ export default defineSchema({
   families: defineTable({
     name: v.string(),
     adminId: v.optional(v.string()),
+    inviteCode: v.optional(v.string()),
     settings: v.optional(v.any()),
-  }),
+  }).index("by_inviteCode", ["inviteCode"]),
 
   users: defineTable({
+    clerkId: v.optional(v.string()),
     username: v.string(),
     email: v.string(),
-    password: v.string(),
+    password: v.optional(v.string()),
     role: v.union(v.literal("USER"), v.literal("ADMIN")),
     familyId: v.optional(v.id("families")),
   })
+    .index("by_clerkId", ["clerkId"])
     .index("by_username", ["username"])
     .index("by_email", ["email"])
     .index("by_familyId", ["familyId"]),

@@ -1,37 +1,39 @@
 'use client'
 
 import { useState, useEffect } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useClerk } from '@clerk/nextjs'
 import { Users, LogOut, Menu, X, ArrowLeft, Package, BarChart3, Settings } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import UserManagement from './UserManagement'
 
 export default function UserManagementPage() {
-  const { data: session, status } = useSession()
+  const { isLoaded, isSignedIn, role, username } = useCurrentUser()
+  const { signOut } = useClerk()
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
 
   // Handle authentication and authorization
   useEffect(() => {
-    if (status === 'loading') return // Still loading
+    if (!isLoaded) return
 
-    if (status === 'unauthenticated') {
-      router.push('/auth/signin')
+    if (!isSignedIn) {
+      router.push('/sign-in')
       return
     }
 
-    if (session?.user?.role !== 'ADMIN') {
+    if (role !== 'ADMIN') {
       router.push('/dashboard')
       return
     }
-  }, [session, status, router])
+  }, [isLoaded, isSignedIn, role, router])
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: '/auth/signin' })
+    signOut({ redirectUrl: '/sign-in' })
   }
 
   // Show loading state while checking authentication
-  if (status === 'loading') {
+  if (!isLoaded) {
     return (
       <div className="min-h-screen bg-gray-50 flex items-center justify-center">
         <div className="text-center">
@@ -43,7 +45,7 @@ export default function UserManagementPage() {
   }
 
   // Don't render if not authenticated or not admin
-  if (status === 'unauthenticated' || session?.user?.role !== 'ADMIN') {
+  if (!isSignedIn || role !== 'ADMIN') {
     return null
   }
 
@@ -73,7 +75,7 @@ export default function UserManagementPage() {
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-700">
-                Welcome, {session?.user?.username}
+                Welcome, {username}
               </span>
               <button
                 onClick={handleSignOut}

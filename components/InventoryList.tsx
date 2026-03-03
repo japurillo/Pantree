@@ -4,8 +4,7 @@ import { useState, useMemo } from 'react'
 import { Search, Filter } from 'lucide-react'
 import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
-import { Id } from '@/convex/_generated/dataModel'
-import { useSession } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import InventoryItem from './InventoryItem'
 
 interface Item {
@@ -27,8 +26,7 @@ interface InventoryListProps {
 }
 
 export default function InventoryList({ onEditItem, onDeleteItem }: InventoryListProps) {
-  const { data: session } = useSession()
-  const userId = session?.user?.id as Id<"users"> | undefined
+  const { userId } = useCurrentUser()
   const items = useQuery(api.items.listItems, userId ? { userId } : "skip") ?? []
   const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
 

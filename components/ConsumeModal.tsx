@@ -5,7 +5,7 @@ import { X, Minus, ChevronLeft, ChevronRight } from 'lucide-react'
 import { useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
-import { useSession } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 
 interface Item {
   id: string
@@ -26,8 +26,7 @@ interface ConsumeModalProps {
 export default function ConsumeModal({ isOpen, item, onClose }: ConsumeModalProps) {
   const [amount, setAmount] = useState(1)
   const [isLoading, setIsLoading] = useState(false)
-  const { data: session } = useSession()
-  const userId = session?.user?.id as Id<"users"> | undefined
+  const { userId } = useCurrentUser()
 
   const consumeItem = useMutation(api.items.consumeItem)
 

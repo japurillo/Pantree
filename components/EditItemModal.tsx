@@ -5,7 +5,7 @@ import { X, Save, Package, ChevronLeft, ChevronRight, Camera, Edit3 } from 'luci
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
-import { useSession } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import ImageUpload from './ui/ImageUpload'
 
 interface Item {
@@ -28,8 +28,7 @@ interface EditItemModalProps {
 }
 
 export default function EditItemModal({ isOpen, onClose, item }: EditItemModalProps) {
-  const { data: session } = useSession()
-  const userId = session?.user?.id as Id<"users"> | undefined
+  const { userId } = useCurrentUser()
 
   const [formData, setFormData] = useState({
     quantity: 0,

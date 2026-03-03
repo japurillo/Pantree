@@ -89,7 +89,7 @@ export default function LandingPage() {
               style={fadeInUp(0.6)}
             >
               <Link
-                href="/auth/signin"
+                href="/sign-in"
                 className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-4 text-lg font-semibold text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/25 transform hover:-translate-y-1"
               >
                 <span className="relative z-10">Login Now</span>
@@ -371,7 +371,7 @@ export default function LandingPage() {
             style={scaleIn(0.6)}
           >
             <Link
-              href="/auth/signin"
+              href="/sign-in"
               className="group relative inline-flex items-center justify-center overflow-hidden rounded-full bg-gradient-to-r from-blue-600 to-purple-600 px-8 py-4 text-lg font-semibold text-white transition-all duration-500 hover:scale-105 hover:shadow-2xl hover:shadow-blue-500/25 transform hover:-translate-y-1"
             >
               <span className="relative z-10">Get Started Free</span>
@@ -442,8 +442,8 @@ export default function LandingPage() {
             Making pantry management simple and collaborative for families everywhere.
           </p>
           <div className="mt-8 flex justify-center space-x-6 text-sm text-gray-500">
-            <Link href="/auth/signin" className="hover:text-gray-900 transition-colors duration-200">Sign In</Link>
-            <Link href="/auth/register" className="hover:text-gray-900 transition-colors duration-200">Register</Link>
+            <Link href="/sign-in" className="hover:text-gray-900 transition-colors duration-200">Sign In</Link>
+            <Link href="/sign-up" className="hover:text-gray-900 transition-colors duration-200">Register</Link>
             <span>© 2025 Pantree. All rights reserved.</span>
           </div>
         </div>

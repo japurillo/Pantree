@@ -5,7 +5,7 @@ import { X, Plus, Package } from 'lucide-react'
 import { useQuery, useMutation } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
-import { useSession } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
 import ImageUpload from './ui/ImageUpload'
 import NumberStepper from './ui/NumberStepper'
 
@@ -29,8 +29,7 @@ interface AddItemModalProps {
 }
 
 export default function AddItemModal({ isOpen, onClose }: AddItemModalProps) {
-  const { data: session } = useSession()
-  const userId = session?.user?.id as Id<"users"> | undefined
+  const { userId } = useCurrentUser()
 
   const [formData, setFormData] = useState({
     name: '',

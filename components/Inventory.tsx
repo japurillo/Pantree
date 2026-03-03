@@ -1,7 +1,8 @@
 'use client'
 
 import { useState } from 'react'
-import { useSession, signOut } from 'next-auth/react'
+import { useCurrentUser } from '@/hooks/useCurrentUser'
+import { useClerk } from '@clerk/nextjs'
 import { Plus, Package, Users, LogOut, Menu, X, ArrowLeft, BarChart3, Settings, FolderOpen, Trash2 } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import { useMutation } from 'convex/react'
@@ -26,8 +27,8 @@ interface Item {
 }
 
 export default function Inventory() {
-  const { data: session } = useSession()
-  const userId = session?.user?.id as Id<"users"> | undefined
+  const { userId, username, role } = useCurrentUser()
+  const { signOut } = useClerk()
   const deleteItemMutation = useMutation(api.items.deleteItem)
   const [showAddModal, setShowAddModal] = useState(false)
   const [showEditModal, setShowEditModal] = useState(false)
@@ -36,10 +37,10 @@ export default function Inventory() {
   const [sidebarOpen, setSidebarOpen] = useState(false)
   const router = useRouter()
 
-  const isAdmin = session?.user?.role === 'ADMIN'
+  const isAdmin = role === 'ADMIN'
 
   const handleSignOut = () => {
-    signOut({ callbackUrl: '/auth/signin' })
+    signOut({ redirectUrl: '/sign-in' })
   }
 
   const handleEditItem = (item: Item) => {
@@ -106,7 +107,7 @@ export default function Inventory() {
 
             <div className="flex items-center space-x-4">
               <span className="text-sm text-gray-700">
-                Welcome, {session?.user?.username}
+                Welcome, {username}
               </span>
               <button
                 onClick={handleSignOut}
