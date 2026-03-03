@@ -15,6 +15,7 @@ export const listUsers = query({
 
     // Strip passwords and add id alias
     return users
+      // eslint-disable-next-line @typescript-eslint/no-unused-vars
       .map(({ password, ...rest }) => ({
         ...rest,
         id: rest._id,
@@ -60,6 +61,7 @@ export const createUser = mutation({
 
     const newUser = await ctx.db.get(newUserId);
     if (!newUser) throw new Error("Failed to create user");
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = newUser;
     return { ...userWithoutPassword, id: newUserId };
   },
@@ -99,6 +101,7 @@ export const updateUser = mutation({
 
     const updated = await ctx.db.get(args.targetUserId);
     if (!updated) throw new Error("User not found after update");
+    // eslint-disable-next-line @typescript-eslint/no-unused-vars
     const { password, ...userWithoutPassword } = updated;
     return { ...userWithoutPassword, id: args.targetUserId };
   },

@@ -59,7 +59,7 @@ export default function AddUserModal({ isOpen, onClose }: AddUserModalProps) {
         const data = await response.json()
         setError(data.error || 'Failed to create user')
       }
-    } catch (error) {
+    } catch {
       setError('An error occurred while creating the user')
     } finally {
       setIsLoading(false)

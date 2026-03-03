@@ -189,6 +189,7 @@ export default function ImageUpload({
       {currentImageUrl && (
         <div className="relative">
           <div className="relative rounded-lg overflow-hidden border border-gray-200">
+            {/* eslint-disable-next-line @next/next/no-img-element */}
             <img
               src={currentImageUrl}
               alt="Preview"

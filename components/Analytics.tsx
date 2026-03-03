@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
 import { motion } from 'framer-motion'
 import { 
@@ -10,12 +10,10 @@ import {
   Menu, 
   X, 
   BarChart3, 
-  Settings, 
-  ArrowLeft, 
+  ArrowLeft,
   FolderOpen,
   TrendingUp,
   DollarSign,
-  Calendar,
   Target,
   Zap,
   Star,
@@ -29,40 +27,15 @@ import { useQuery } from 'convex/react'
 import { api } from '@/convex/_generated/api'
 import { Id } from '@/convex/_generated/dataModel'
 
-interface Category {
-  id: string
-  name: string
-}
-
-interface Item {
-  id: string
-  name: string
-  quantity: number
-  threshold: number
-  imageUrl?: string
-  description?: string
-  notes?: string
-  category: {
-    id: string
-    name: string
-  }
-}
-
 export default function Analytics() {
   const { data: session } = useSession()
   const [sidebarOpen, setSidebarOpen] = useState(false)
-  const [isLoaded, setIsLoaded] = useState(false)
   const router = useRouter()
   const isAdmin = session?.user?.role === 'ADMIN'
 
   const userId = session?.user?.id as Id<"users"> | undefined
   const items = useQuery(api.items.listItems, userId ? { userId } : "skip") ?? []
   const categories = useQuery(api.categories.listCategories, userId ? { userId } : "skip") ?? []
-
-  useEffect(() => {
-    const timer = setTimeout(() => setIsLoaded(true), 100)
-    return () => clearTimeout(timer)
-  }, [])
 
   const handleSignOut = () => {
     signOut({ callbackUrl: '/auth/signin' })

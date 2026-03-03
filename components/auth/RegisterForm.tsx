@@ -52,7 +52,7 @@ export default function RegisterForm() {
         const data = await response.json()
         setError(data.error || 'Registration failed')
       }
-    } catch (error) {
+    } catch {
       setError('An error occurred. Please try again.')
     } finally {
       setIsLoading(false)

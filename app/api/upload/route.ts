@@ -77,8 +77,8 @@ export async function POST(request: NextRequest) {
 
     console.log('Upload API: Upload completed successfully')
     return NextResponse.json({
-      url: (result as any).secure_url,
-      publicId: (result as any).public_id
+      url: (result as Record<string, unknown>).secure_url,
+      publicId: (result as Record<string, unknown>).public_id
     })
   } catch (error) {
     console.error('Upload API: Upload error:', error)

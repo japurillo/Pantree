@@ -78,9 +78,10 @@ export default function TestImagePage() {
               <div className="space-y-4">
                 <div>
                   <h3 className="font-medium text-gray-700">Uploaded Image:</h3>
-                  <img 
-                    src={uploadedUrl} 
-                    alt="Uploaded" 
+                  {/* eslint-disable-next-line @next/next/no-img-element */}
+                  <img
+                    src={uploadedUrl}
+                    alt="Uploaded"
                     className="mt-2 max-w-full h-auto rounded-lg border"
                   />
                 </div>

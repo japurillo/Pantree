@@ -1,13 +1,14 @@
 /** @type {import('next').NextConfig} */
 const nextConfig = {
   images: {
-    domains: ['res.cloudinary.com'],
+    remotePatterns: [
+      {
+        protocol: 'https',
+        hostname: 'res.cloudinary.com',
+      },
+    ],
   },
-  experimental: {
-    // Increase timeout for API routes
-    serverComponentsExternalPackages: ['cloudinary'],
-  },
-  // Configure API route timeouts
+  serverExternalPackages: ['cloudinary'],
   async headers() {
     return [
       {

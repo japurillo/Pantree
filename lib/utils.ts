@@ -7,7 +7,7 @@ export function cn(...inputs: ClassValue[]) {
 }
 
 // Debounce function for performance optimization
-export function debounce<T extends (...args: any[]) => any>(
+export function debounce<T extends (...args: unknown[]) => unknown>(
   func: T,
   wait: number
 ): (...args: Parameters<T>) => void {
@@ -19,7 +19,7 @@ export function debounce<T extends (...args: any[]) => any>(
 }
 
 // Throttle function for performance optimization
-export function throttle<T extends (...args: any[]) => any>(
+export function throttle<T extends (...args: unknown[]) => unknown>(
   func: T,
   limit: number
 ): (...args: Parameters<T>) => void {
@@ -70,7 +70,7 @@ export function deepClone<T>(obj: T): T {
   if (typeof obj === 'object') {
     const clonedObj = {} as T
     for (const key in obj) {
-      if (obj.hasOwnProperty(key)) {
+      if (Object.prototype.hasOwnProperty.call(obj, key)) {
         clonedObj[key] = deepClone(obj[key])
       }
     }
@@ -80,7 +80,7 @@ export function deepClone<T>(obj: T): T {
 }
 
 // Check if object is empty
-export function isEmpty(obj: any): boolean {
+export function isEmpty(obj: unknown): boolean {
   if (obj == null) return true
   if (Array.isArray(obj) || typeof obj === 'string') return obj.length === 0
   if (obj instanceof Map || obj instanceof Set) return obj.size === 0
@@ -132,7 +132,7 @@ export async function retry<T>(
 
 // Local storage utilities with error handling
 export const storage = {
-  get: (key: string): any => {
+  get: (key: string): unknown => {
     try {
       const item = localStorage.getItem(key)
       return item ? JSON.parse(item) : null
@@ -141,7 +141,7 @@ export const storage = {
     }
   },
   
-  set: (key: string, value: any): boolean => {
+  set: (key: string, value: unknown): boolean => {
     try {
       localStorage.setItem(key, JSON.stringify(value))
       return true

@@ -29,9 +29,9 @@ export async function POST(request: NextRequest) {
       { message: 'User registered successfully' },
       { status: 201 }
     )
-  } catch (error: any) {
+  } catch (error: unknown) {
     console.error('Registration error:', error)
-    if (error.message?.includes('already exists')) {
+    if (error instanceof Error && error.message?.includes('already exists')) {
       return NextResponse.json({ error: error.message }, { status: 400 })
     }
     return NextResponse.json(

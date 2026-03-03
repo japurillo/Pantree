@@ -2,7 +2,7 @@
 
 import { useState } from 'react'
 import { useSession, signOut } from 'next-auth/react'
-import { Package, Users, LogOut, Menu, X, BarChart3, Settings, ArrowLeft, FolderOpen } from 'lucide-react'
+import { Package, Users, LogOut, Menu, X, BarChart3, Settings, FolderOpen } from 'lucide-react'
 import { useRouter } from 'next/navigation'
 import LowStockOverview from './LowStockOverview'
 import PantryList from './PantryList'

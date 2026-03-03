@@ -21,11 +21,6 @@ interface Item {
   }
 }
 
-interface Category {
-  id: string
-  name: string
-}
-
 interface InventoryListProps {
   onEditItem: (item: Item) => void
   onDeleteItem: (item: Item) => void

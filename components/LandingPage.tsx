@@ -1,7 +1,7 @@
 'use client'
 
 import Link from 'next/link'
-import { ArrowRight, CheckCircle, Star, Users, TrendingUp, Shield, Zap } from 'lucide-react'
+import { ArrowRight, CheckCircle, Star, Users, TrendingUp, Shield } from 'lucide-react'
 import { useEffect, useState } from 'react'
 
 export default function LandingPage() {
