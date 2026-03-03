@@ -18,7 +18,7 @@ export const listItems = query({
         return {
           ...item,
           id: item._id,
-          category: category ? { id: category._id, name: category.name } : null,
+          category: { id: category?._id ?? item.categoryId, name: category?.name ?? "Unknown" },
           createdAt: new Date(item._creationTime).toISOString(),
         };
       })
@@ -40,7 +40,7 @@ export const getItem = query({
     return {
       ...item,
       id: item._id,
-      category: category ? { id: category._id, name: category.name } : null,
+      category: { id: category?._id ?? item.categoryId, name: category?.name ?? "Unknown" },
       createdAt: new Date(item._creationTime).toISOString(),
     };
   },

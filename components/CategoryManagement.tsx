@@ -12,7 +12,6 @@ interface Category {
   name: string
   description?: string
   createdAt: string
-  updatedAt: string
 }
 
 interface AddCategoryModalProps {
